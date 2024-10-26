@@ -1,6 +1,5 @@
 import math
 
-
 class BuildingHeatLoss:
     def __init__(
         self,
@@ -224,9 +223,8 @@ class BuildingHeatLoss:
 
         Q_total = Q_transmission + Q_ventilation_heat_loss + Q_thermal_bridge
         return Q_total
-    
-    def calculate_thermal_mass(self):
 
+    def calculate_thermal_mass(self):
         # Thermal mass values for different materials
         thermal_mass_values = {
             # Wall materials (kJ/m²K for typical thicknesses)

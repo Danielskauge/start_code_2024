@@ -3,7 +3,7 @@ from dash import html, dcc, callback_context
 import dash_leaflet as dl
 import plotly.graph_objs as go
 import logging
-from dash.dependencies import Input, Output, State, ALL
+from dash.dependencies import Input, Output, ALL
 from model import get_heating_simulation, get_location_name
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class EnergySimulationDashboard:
         self.apartments = []
         self.selected_location = None
         self.expanded_view = False
-        self.focused_apartment = None
+        self.current_apartment = None  # New property to track current apartment
 
         # Initialize layout and callbacks
         self.setup_layout()
@@ -193,11 +193,26 @@ class EnergySimulationDashboard:
                     className="w-full p-1 mb-4",
                     style={'color': 'black'}
                 ),
+                # Occupant Profile Input
+                html.H3("Occupant Profile", className="text-lg font-semibold text-green-200 mb-2"),
+                html.Label("Number of Occupants per Hour (comma-separated):", className="text-gray-300 text-sm"),
+                dcc.Textarea(
+                    id="input-occupant-profile",
+                    value="2,2,2,2,2,2,0,0,0,0,2,2,4,4,4,4,4,4,4,4,4,4,2,2",
+                    style={'width': '100%', 'height': '100px', 'color': 'black'},
+                    className="mb-4"
+                ),
                 html.Button(
                     "Add Location",
                     id="add-location-btn",
                     className="bg-green-500 text-white font-bold py-2 px-4 rounded mt-4",
                     disabled=True
+                ),
+                html.Button(
+                    "Run Simulation",
+                    id="run-simulation-btn",
+                    className="bg-yellow-500 text-white font-bold py-2 px-4 rounded mt-4",
+                    disabled=True  # Initially disabled
                 )
             ]
         )
@@ -222,45 +237,8 @@ class EnergySimulationDashboard:
         """Create a forecast card displaying simulation results."""
         simulation = apartment['simulation']
         location_name = apartment['name']
-        temperatures_inside = simulation['temperatures_inside']
-        temperatures_outside = simulation['temperatures_outside']
         energy_consumption = simulation['energy_consumption']
-        Q_heating = simulation['Q_heating']
-        Q_loss = simulation['Q_loss']
         hours = list(range(24))
-
-        # Create temperature graph
-        temperature_graph = dcc.Graph(
-            figure={
-                "data": [
-                    go.Scatter(
-                        x=hours,
-                        y=temperatures_inside[1:],  # Skip the initial temperature
-                        mode="lines+markers",
-                        name="Inside Temperature",
-                        line=dict(color="orange")
-                    ),
-                    go.Scatter(
-                        x=hours,
-                        y=temperatures_outside,
-                        mode="lines+markers",
-                        name="Outside Temperature",
-                        line=dict(color="blue")
-                    ),
-                ],
-                "layout": go.Layout(
-                    title="Temperature Variation",
-                    xaxis={"title": "Hour"},
-                    yaxis={"title": "Temperature (°C)"},
-                    legend={"x": 0, "y": 1},
-                    hovermode="closest",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font={"color": "white"},
-                ),
-            },
-            className="mt-4",
-        )
 
         # Create energy consumption graph
         energy_graph = dcc.Graph(
@@ -287,46 +265,11 @@ class EnergySimulationDashboard:
             className="mt-4",
         )
 
-        # Create heat flow graph
-        heat_flow_graph = dcc.Graph(
-            figure={
-                "data": [
-                    go.Scatter(
-                        x=hours,
-                        y=Q_heating,
-                        mode="lines+markers",
-                        name="Heat Pump Output",
-                        line=dict(color="red")
-                    ),
-                    go.Scatter(
-                        x=hours,
-                        y=Q_loss,
-                        mode="lines+markers",
-                        name="Heat Loss",
-                        line=dict(color="purple")
-                    ),
-                ],
-                "layout": go.Layout(
-                    title="Heat Pump Output vs. Heat Loss",
-                    xaxis={"title": "Hour"},
-                    yaxis={"title": "Heat Flow (kWh)"},
-                    legend={"x": 0, "y": 1},
-                    hovermode="closest",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font={"color": "white"},
-                ),
-            },
-            className="mt-4",
-        )
-
         return html.Div(
             className="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-sm",
             children=[
                 html.H3(f"{location_name}", className="text-lg font-semibold text-green-400"),
-                temperature_graph,
                 energy_graph,
-                heat_flow_graph,
             ],
         )
 
@@ -336,7 +279,7 @@ class EnergySimulationDashboard:
             className="w-52 h-60 bg-gray-700 p-4 rounded-lg border border-gray-600 shadow-sm flex flex-col items-center justify-center cursor-pointer hover:bg-gray-600 transition duration-300",
             children=[
                 html.H3(
-                    apartment["name"], 
+                    apartment["name"],
                     className="text-sm font-semibold text-green-400 text-center mb-2"
                 ),
                 html.Div(
@@ -361,7 +304,7 @@ class EnergySimulationDashboard:
                 )
             ],
             n_clicks=0,
-            id={"type": "gallery-card", "index": apartment["name"]}
+            id={"type": "gallery-card", "index": apartment["id"]}
         )
 
     def setup_callbacks(self):
@@ -370,55 +313,75 @@ class EnergySimulationDashboard:
             [
                 Output("layer", "children"),
                 Output("add-location-btn", "disabled"),
+                Output("run-simulation-btn", "disabled"),
                 Output("forecast-info", "children"),
                 Output("gallery", "children"),
-                Output("toggle-view-btn", "children")
+                Output("toggle-view-btn", "children"),
+                Output("input-residents", "value"),
+                Output("input-size", "value"),
+                Output("input-length", "value"),
+                Output("input-width", "value"),
+                Output("input-wall-height", "value"),
+                Output("input-glazing-ratio", "value"),
+                Output("input-num-windows", "value"),
+                Output("input-num-doors", "value"),
+                Output("input-roof-type", "value"),
+                Output("input-roof-pitch", "value"),
+                Output("input-occupant-profile", "value"),
+                Output("map", "clickData")
             ],
             [
                 Input("map", "clickData"),
                 Input("add-location-btn", "n_clicks"),
+                Input("run-simulation-btn", "n_clicks"),
                 Input("toggle-view-btn", "n_clicks"),
-                Input({"type": "gallery-card", "index": ALL}, "n_clicks")
+                Input({"type": "gallery-card", "index": ALL}, "n_clicks"),
+                # Add Inputs for all input fields
+                Input("input-residents", "value"),
+                Input("input-size", "value"),
+                Input("input-length", "value"),
+                Input("input-width", "value"),
+                Input("input-wall-height", "value"),
+                Input("input-glazing-ratio", "value"),
+                Input("input-num-windows", "value"),
+                Input("input-num-doors", "value"),
+                Input("input-roof-type", "value"),
+                Input("input-roof-pitch", "value"),
+                Input("input-occupant-profile", "value"),
             ],
-            [
-                State("input-residents", "value"),
-                State("input-size", "value"),
-                State("input-length", "value"),
-                State("input-width", "value"),
-                State("input-wall-height", "value"),
-                State("input-glazing-ratio", "value"),
-                State("input-num-windows", "value"),
-                State("input-num-doors", "value"),
-                State("input-roof-type", "value"),
-                State("input-roof-pitch", "value"),
-            ]
+            []
         )
-        def handle_map_click_or_add_location(
-            click_data, n_clicks, toggle_n_clicks, gallery_clicks,
+        def handle_callbacks(
+            click_data, add_n_clicks, run_n_clicks, toggle_n_clicks, gallery_clicks,
             residents, size, length, width, wall_height,
-            glazing_ratio, num_windows, num_doors, roof_type, roof_pitch
+            glazing_ratio, num_windows, num_doors, roof_type, roof_pitch,
+            occupant_profile_input
         ):
-            # Default values for outputs
-            markers = [
-                dl.Marker(position=(apt["lat"], apt["lon"]),
-                          children=[dl.Tooltip(f"{apt['name']}")])
-                for apt in self.apartments
-            ]
+            # Initialize variables
+            markers = [dl.Marker(position=(apt["lat"], apt["lon"]),
+                                 children=[dl.Tooltip(f"{apt['name']}")])
+                       for apt in self.apartments]
             forecast_cards = []
-            gallery_cards = [
-                self.create_gallery_card(apt) for apt in self.apartments
-            ]
             disable_add_location = True
+            disable_run_simulation = True
             toggle_button_text = "Switch to Gallery View" if self.expanded_view else "Switch to Card View"
             ctx = callback_context
 
-            # Helper functions to identify the triggered input
+            # Helper function to identify the triggered input
             def is_triggered_by(prop):
                 return any(prop in triggered_id for triggered_id in ctx.triggered_prop_ids)
 
+            # Parse occupant profile
             try:
-                # Map click handling - enables adding a new location
+                occupant_profile = [int(x.strip()) for x in occupant_profile_input.split(',')]
+                if len(occupant_profile) != 24:
+                    occupant_profile = [0] * 24
+            except:
+                occupant_profile = [0] * 24
+
+            try:
                 if is_triggered_by("map") and click_data and "latlng" in click_data:
+                    # Map click handling
                     self.selected_location = click_data["latlng"]
                     preview_marker = dl.Marker(
                         position=(self.selected_location["lat"], self.selected_location["lng"]),
@@ -427,12 +390,11 @@ class EnergySimulationDashboard:
                     markers.append(preview_marker)
                     disable_add_location = False
 
-                # Add location handling - store selected location details
-                elif is_triggered_by("add-location-btn") and n_clicks and self.selected_location:
+                elif is_triggered_by("add-location-btn") and add_n_clicks and self.selected_location:
+                    # Add location handling
                     lat, lon = self.selected_location["lat"], self.selected_location["lng"]
                     location_name = get_location_name(lat, lon)
 
-                    # Prepare building parameters
                     building_params = {
                         'length': length,
                         'width': width,
@@ -442,10 +404,7 @@ class EnergySimulationDashboard:
                         'num_doors': num_doors,
                         'roof_type': roof_type,
                         'roof_pitch': roof_pitch,
-                        # Use default values for U-values, materials, etc., or add inputs as needed
                     }
-
-                    # Prepare heating system parameters
                     heating_params = {
                         'COP': 3.5,
                         'min_Q_heating': 0,
@@ -454,66 +413,154 @@ class EnergySimulationDashboard:
                         'initial_temperature_inside': 18
                     }
 
-                    # Run the heating simulation
                     simulation_results = get_heating_simulation(
-                        lat, lon, building_params, heating_params
+                        lat, lon, building_params, heating_params, occupant_profile=occupant_profile
                     )
 
                     if 'error' not in simulation_results:
-                        self.apartments.append({
+                        apartment = {
+                            "id": len(self.apartments),  # Unique ID
                             "lat": lat, "lon": lon, "name": location_name,
-                            "residents": residents, "size": size, "simulation": simulation_results
-                        })
-                        # Update markers and reset selected location
+                            "residents": residents, "size": size,
+                            "building_params": building_params,
+                            "heating_params": heating_params,
+                            "occupant_profile": occupant_profile,
+                            "simulation": simulation_results
+                        }
+                        self.apartments.append(apartment)
+                        self.current_apartment = apartment
                         self.selected_location = None
                         markers = [
                             dl.Marker(position=(apt["lat"], apt["lon"]),
                                       children=[dl.Tooltip(f"{apt['name']}")])
                             for apt in self.apartments
                         ]
-                        disable_add_location = True  # Disable the button after adding
+                        disable_add_location = True
+                        disable_run_simulation = False
+                        forecast_cards = [self.create_forecast_card(apartment)]
                     else:
-                        # Handle error (e.g., display a message)
-                        pass
+                        pass  # Handle error
 
-                # Toggle between gallery and expanded views
+                elif is_triggered_by("gallery-card"):
+                    # Gallery card click handling
+                    # Find which gallery card was clicked
+                    for i, n_clicks in enumerate(gallery_clicks):
+                        if n_clicks and n_clicks > 0:
+                            self.current_apartment = self.apartments[i]
+                            # Reset the n_clicks to prevent multiple triggers
+                            gallery_clicks[i] = 0
+                            break
+                    if self.current_apartment:
+                        residents = self.current_apartment['residents']
+                        size = self.current_apartment['size']
+                        building_params = self.current_apartment['building_params']
+                        length = building_params['length']
+                        width = building_params['width']
+                        wall_height = building_params['wall_height']
+                        glazing_ratio = building_params['glazing_ratio']
+                        num_windows = building_params['num_windows']
+                        num_doors = building_params['num_doors']
+                        roof_type = building_params['roof_type']
+                        roof_pitch = building_params['roof_pitch']
+                        occupant_profile = self.current_apartment.get('occupant_profile', [0]*24)
+                        occupant_profile_input = ','.join(map(str, occupant_profile))
+                        disable_run_simulation = False
+                        forecast_cards = [self.create_forecast_card(self.current_apartment)]
+                    else:
+                        # Defaults if apartment not found
+                        residents = dash.no_update
+                        size = dash.no_update
+                        length = dash.no_update
+                        width = dash.no_update
+                        wall_height = dash.no_update
+                        glazing_ratio = dash.no_update
+                        num_windows = dash.no_update
+                        num_doors = dash.no_update
+                        roof_type = dash.no_update
+                        roof_pitch = dash.no_update
+                        occupant_profile_input = dash.no_update
+                        disable_run_simulation = True
+
                 elif is_triggered_by("toggle-view-btn"):
                     self.expanded_view = not self.expanded_view
-                    self.focused_apartment = None if not self.expanded_view else self.focused_apartment
+                    self.current_apartment = None if not self.expanded_view else self.current_apartment
 
-                # Handle gallery card clicks to focus on a specific apartment
-                elif is_triggered_by("gallery-card"):
-                    clicked_index = ctx.triggered_prop_ids[0].split(".")[0].split(":")[-1].strip('"')
-                    self.focused_apartment = next(
-                        (apt for apt in self.apartments if apt["name"] == clicked_index), None
-                    )
-                    self.expanded_view = True
+                else:
+                    # Enable the "Run Simulation" button if there's a current apartment
+                    disable_run_simulation = False if self.current_apartment else True
+                    if self.current_apartment:
+                        # Update apartment parameters
+                        building_params = {
+                            'length': length,
+                            'width': width,
+                            'wall_height': wall_height,
+                            'glazing_ratio': glazing_ratio,
+                            'num_windows': num_windows,
+                            'num_doors': num_doors,
+                            'roof_type': roof_type,
+                            'roof_pitch': roof_pitch,
+                        }
+                        self.current_apartment['building_params'] = building_params
+                        self.current_apartment['residents'] = residents
+                        self.current_apartment['size'] = size
+                        self.current_apartment['occupant_profile'] = occupant_profile
 
-                # Create forecast cards for expanded view, only showing the focused apartment's details
-                if self.expanded_view and self.focused_apartment:
-                    forecast_cards = [
-                        self.create_forecast_card(self.focused_apartment)
-                    ]
+                        # Re-run simulation
+                        heating_params = self.current_apartment.get('heating_params', {})
+                        simulation_results = get_heating_simulation(
+                            self.current_apartment['lat'], self.current_apartment['lon'],
+                            building_params, heating_params, occupant_profile=occupant_profile
+                        )
+                        self.current_apartment['simulation'] = simulation_results
+                        forecast_cards = [self.create_forecast_card(self.current_apartment)]
+                    else:
+                        forecast_cards = []
+
+                # Update gallery and forecast cards
+                if self.expanded_view and self.current_apartment:
+                    forecast_cards = [self.create_forecast_card(self.current_apartment)]
+                    gallery_cards = []
                 elif self.expanded_view:
-                    # Display all apartments if there's no specific focus (edge case)
                     forecast_cards = [
                         self.create_forecast_card(apt)
                         for apt in self.apartments
                     ]
+                    gallery_cards = []
+                else:
+                    forecast_cards = []
+                    gallery_cards = [self.create_gallery_card(apt) for apt in self.apartments]
 
-                # Prepare gallery cards only if not in expanded view
-                gallery_cards = [self.create_gallery_card(apt) for apt in self.apartments] if not self.expanded_view else []
+                return (
+                    markers,
+                    disable_add_location,
+                    disable_run_simulation,
+                    forecast_cards,
+                    gallery_cards,
+                    toggle_button_text,
+                    residents,
+                    size,
+                    length,
+                    width,
+                    wall_height,
+                    glazing_ratio,
+                    num_windows,
+                    num_doors,
+                    roof_type,
+                    roof_pitch,
+                    occupant_profile_input,
+                    None  # Reset map clickData
+                )
 
-                return markers, disable_add_location, forecast_cards, gallery_cards, toggle_button_text
-
-            except KeyError as e:
-                logger.error(f"KeyError: Missing data key - {e}")
             except Exception as e:
                 logger.error(f"Callback error: {e}")
-
-            # Return defaults in case of error
-            return markers, True, forecast_cards, gallery_cards, toggle_button_text
+                # Return defaults in case of error
+                return markers, True, True, forecast_cards, [], toggle_button_text, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, None
 
     def run(self):
         """Run the dashboard server."""
         self.app.run_server(debug=True)
+
+# Instantiate and run the dashboard
+if __name__ == "__main__":
+    dashboard = EnergySimulationDashboard()
+    dashboard.run()

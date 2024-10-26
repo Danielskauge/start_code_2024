@@ -1,8 +1,7 @@
 import requests
-from datetime import datetime, timedelta
 from functools import lru_cache
 import logging
-from typing import Dict, List, Union, Optional
+from typing import Dict, Optional, List
 from heatModule.buildingHeatLoss import BuildingHeatLoss
 from heatModule.heatingModule import HeatingSystem
 
@@ -47,11 +46,13 @@ def get_location_name(lat: float, lon: float) -> str:
     except requests.RequestException as e:
         logger.error(f"Geocoding failed: {e}")
         return "Unknown Location"
+
 def get_heating_simulation(
     lat: float, 
     lon: float, 
     building_params: Dict, 
-    heating_params: Dict
+    heating_params: Dict,
+    occupant_profile: List[int]
 ) -> Dict:
     """Run the heating simulation using the new models."""
     # Fetch weather data
@@ -79,11 +80,16 @@ def get_heating_simulation(
     # Define temperature setpoints (assuming constant setpoint)
     temperature_setpoints = [heating_params.get('temperature_setpoint', 20)] * 24
     
+    # Adjust for internal heat gains from occupants
+    # Assuming each occupant generates 100W of heat
+    internal_heat_gains = [occupants * 0.1 for occupants in occupant_profile]  # Convert W to kW
+    
     # Run the simulation
     temperatures_inside, energy_consumption, Q_heating, Q_loss = heating_system.simulate_heating(
         temperatures_outside,
         temperature_setpoints,
-        heating_params.get('initial_temperature_inside', 18)
+        heating_params.get('initial_temperature_inside', 18),
+        internal_heat_gains=internal_heat_gains
     )
     
     # Prepare the results
