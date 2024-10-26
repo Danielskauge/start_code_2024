@@ -127,73 +127,117 @@ def is_weekend(timestamp: datetime) -> bool:
     """Check if timestamp is on weekend"""
     return timestamp.weekday() >= 5
 
-def simulate_consumption(
-    building: Building,
-    weather_forecast: Dict[str, List]
-) -> List[float]:
+def generate_synthetic_consumption(timestamps: List[datetime]) -> List[float]:
     """
-    Simulate building consumption for tomorrow using CREST model
+    Generate synthetic consumption data with realistic patterns
     
-    Parameters:
-        building: Building configuration
-        weather_forecast: Weather forecast for tomorrow
-        
+    Args:
+        timestamps: List of hourly timestamps
+    
     Returns:
-        List of hourly consumption values in kW for tomorrow (00:00-23:00)
+        List of hourly consumption values in kW
     """
-    appliances = get_building_appliances(building.building_type)
     consumption = []
     
-    # Weather forecast should contain 24 hours for tomorrow
-    timestamps = weather_forecast['timestamp']
+    for timestamp in timestamps:
+        hour = timestamp.hour
+        
+        # Base load (always on)
+        base_load = 0.5
+        
+        # Daily pattern
+        hour_factor = np.sin(hour * np.pi / 12) * 0.5 + 1.0
+        
+        # Morning peak (7-9)
+        if 7 <= hour <= 9:
+            hour_factor *= 1.5
+            
+        # Evening peak (17-21)
+        if 17 <= hour <= 21:
+            hour_factor *= 1.8
+            
+        # Night valley (0-5)
+        if 0 <= hour <= 5:
+            hour_factor *= 0.6
+        
+        # Add some random variation
+        random_factor = np.random.normal(1, 0.1)
+        
+        # Combine all factors
+        load = base_load * hour_factor * random_factor
+        
+        consumption.append(max(0, load))
+    
+    return consumption
+
+def simulate_consumption(building: Building, weather_data: Dict[str, List]) -> List[float]:
+    """
+    Main consumption simulation function, now using synthetic data
+    
+    Args:
+        building: Building configuration
+        weather_data: Weather forecast data
+        
+    Returns:
+        List of hourly consumption values in kW
+    """
+    return generate_synthetic_consumption(weather_data['timestamp'])
+
+def simulate_simple_consumption(building: Building, weather_data: Dict[str, List]) -> List[float]:
+    """
+    Simplified consumption simulation with realistic daily patterns
+    
+    Args:
+        building: Building configuration
+        weather_data: Weather forecast data
+        
+    Returns:
+        List of hourly consumption values in kW
+    """
+    consumption = []
+    timestamps = weather_data['timestamp']
+    temperatures = weather_data['temperature']
     
     for i, timestamp in enumerate(timestamps):
         hour = timestamp.hour
-        temperature = weather_forecast['temperature'][i]
-        weekend = is_weekend(timestamp)
+        temperature = temperatures[i]
         
-        # Get occupancy factor for this period
-        time_period = get_time_period(hour)
-        day_type = 'weekend' if weekend else 'weekday'
-        occupancy = OCCUPANCY_PROFILES[building.building_type][day_type][time_period]
+        # Base load
+        base_load = 0.5
         
-        # Base load for this hour
-        hour_load = 0.0
+        # Daily pattern (higher during day, lower at night)
+        hour_factor = np.sin(hour * np.pi / 12) * 0.5 + 1.0
         
-        for appliance in appliances:
-            power = appliance.rated_power
+        # Morning peak (7-9)
+        if 7 <= hour <= 9:
+            hour_factor *= 1.5
             
-            # Apply temperature dependency
-            if appliance.temperature_dependent:
-                if temperature < 16:
-                    # Heating needed
-                    power *= 1 + 0.1 * (16 - temperature)
-                elif temperature > 22:
-                    # Cooling needed
-                    power *= 1 + 0.1 * (temperature - 22)
+        # Evening peak (17-21)
+        if 17 <= hour <= 21:
+            hour_factor *= 1.8
             
-            # Apply occupancy dependency
-            if appliance.occupancy_dependent:
-                power *= occupancy
-            
-            # Apply schedule
-            power *= appliance.schedule[hour]
-            
-            # Apply duty cycle
-            power *= appliance.duty_cycle
-            
-            # Add to total load
-            hour_load += power
+        # Night valley (0-5)
+        if 0 <= hour <= 5:
+            hour_factor *= 0.6
         
-        # Scale by floor area and occupants
-        if building.building_type == BuildingType.RESIDENTIAL:
-            hour_load *= (building.floor_area / 100) * (building.num_occupants / 2)
-        else:
-            hour_load *= (building.floor_area / 1000)
+        # Temperature effect (more consumption when very cold or very hot)
+        temp_factor = 1.0
+        if temperature < 16:
+            temp_factor += 0.1 * (16 - temperature)  # More heating needed
+        elif temperature > 22:
+            temp_factor += 0.05 * (temperature - 22)  # More cooling needed
         
-        # Add random variation
-        hour_load *= (1 + np.random.normal(0, 0.05))
+        # Random variation
+        random_factor = np.random.normal(1, 0.1)
         
-        consumption.append(max(0, hour_load))
+        # Combine all factors
+        load = base_load * hour_factor * temp_factor * random_factor
+        
+        # Scale based on battery size as a proxy for building size
+        # Assuming larger batteries are installed in larger buildings
+        size_factor = building.battery_capacity_kwh / 10  # Normalized to 10kWh battery
+        load *= size_factor
+        
+        consumption.append(max(0, load))
     
     return consumption

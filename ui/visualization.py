@@ -4,7 +4,7 @@ import dash_leaflet as dl
 import plotly.graph_objs as go
 import logging
 from dash.dependencies import Input, Output, State, ALL
-from model import get_hourly_demand_data, get_location_name
+from model import get_heating_simulation, get_location_name
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class EnergySimulationDashboard:
     def create_settings_panel(self):
         """Create the settings panel with input controls."""
         return html.Div(
-            className="flex-1 p-4 bg-gray-700 rounded-lg border border-gray-600 shadow-inner",
+            className="flex-1 p-4 bg-gray-700 rounded-lg border border-gray-600 shadow-inner overflow-y-auto",
             children=[
                 html.H3("Apartment Settings", className="text-lg font-semibold text-green-200 mb-2"),
                 html.Label("Number of Residents:", className="text-gray-300 text-sm"),
@@ -98,6 +98,98 @@ class EnergySimulationDashboard:
                     min=20,
                     max=200,
                     step=5,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                # Add inputs for building parameters
+                html.H3("Building Parameters", className="text-lg font-semibold text-green-200 mb-2"),
+                html.Label("Building Length (m):", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-length",
+                    type="number",
+                    value=10,
+                    min=5,
+                    max=50,
+                    step=1,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Building Width (m):", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-width",
+                    type="number",
+                    value=8,
+                    min=5,
+                    max=50,
+                    step=1,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Wall Height (m):", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-wall-height",
+                    type="number",
+                    value=2.5,
+                    min=2,
+                    max=5,
+                    step=0.1,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Glazing Ratio:", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-glazing-ratio",
+                    type="number",
+                    value=0.15,
+                    min=0.05,
+                    max=0.5,
+                    step=0.01,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Number of Windows:", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-num-windows",
+                    type="number",
+                    value=4,
+                    min=0,
+                    max=20,
+                    step=1,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Number of Doors:", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-num-doors",
+                    type="number",
+                    value=1,
+                    min=0,
+                    max=5,
+                    step=1,
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Roof Type:", className="text-gray-300 text-sm"),
+                dcc.Dropdown(
+                    id="input-roof-type",
+                    options=[
+                        {'label': 'Flat', 'value': 'flat'},
+                        {'label': 'Gable', 'value': 'gable'},
+                        {'label': 'Hip', 'value': 'hip'},
+                        {'label': 'Shed', 'value': 'shed'}
+                    ],
+                    value='gable',
+                    className="w-full p-1 mb-4",
+                    style={'color': 'black'}
+                ),
+                html.Label("Roof Pitch (degrees):", className="text-gray-300 text-sm"),
+                dcc.Input(
+                    id="input-roof-pitch",
+                    type="number",
+                    value=35,
+                    min=0,
+                    max=60,
+                    step=1,
                     className="w-full p-1 mb-4",
                     style={'color': 'black'}
                 ),
@@ -126,40 +218,104 @@ class EnergySimulationDashboard:
             ]
         )
 
-    def create_forecast_card(self, day_data, location_name):
-        """Create a forecast card displaying weather and demand details."""
-        weather_icon_url = f"http://openweathermap.org/img/wn/{day_data.get('weather_icon', '01d')}@2x.png"
-        weather_description = day_data.get("weather_description", "No description")
-        temperature = day_data.get("temperature", "N/A")
-        humidity = day_data.get("humidity", "N/A")
-        wind_speed = day_data.get("wind_speed", "N/A")
-        avg_demand = day_data.get("average_demand", "N/A")
-        hourly_demand = day_data["hourly_demand"]
+    def create_forecast_card(self, apartment):
+        """Create a forecast card displaying simulation results."""
+        simulation = apartment['simulation']
+        location_name = apartment['name']
+        temperatures_inside = simulation['temperatures_inside']
+        temperatures_outside = simulation['temperatures_outside']
+        energy_consumption = simulation['energy_consumption']
+        Q_heating = simulation['Q_heating']
+        Q_loss = simulation['Q_loss']
+        hours = list(range(24))
 
-        hourly_times = [hour["time"] for hour in hourly_demand]
-        hourly_demands = [float(hour["demand"].split(" ")[0]) for hour in hourly_demand]
-
-        demand_graph = dcc.Graph(
+        # Create temperature graph
+        temperature_graph = dcc.Graph(
             figure={
                 "data": [
                     go.Scatter(
-                        x=hourly_times,
-                        y=hourly_demands,
+                        x=hours,
+                        y=temperatures_inside[1:],  # Skip the initial temperature
                         mode="lines+markers",
-                        marker=dict(size=6, color="rgba(51,204,204,0.8)"),
-                        line=dict(color="rgba(0,128,128,0.8)", width=2),
-                        hoverinfo="x+y",
-                    )
+                        name="Inside Temperature",
+                        line=dict(color="orange")
+                    ),
+                    go.Scatter(
+                        x=hours,
+                        y=temperatures_outside,
+                        mode="lines+markers",
+                        name="Outside Temperature",
+                        line=dict(color="blue")
+                    ),
                 ],
-                "layout": {
-                    "title": "24-Hour Demand Forecast",
-                    "xaxis": {"title": "Time", "showgrid": True, "gridcolor": "gray"},
-                    "yaxis": {"title": "Demand (kWh)", "showgrid": True, "gridcolor": "gray"},
-                    "plot_bgcolor": "rgba(0,0,0,0)",
-                    "paper_bgcolor": "rgba(0,0,0,0)",
-                    "font": {"color": "white"},
-                    "hovermode": "closest",
-                },
+                "layout": go.Layout(
+                    title="Temperature Variation",
+                    xaxis={"title": "Hour"},
+                    yaxis={"title": "Temperature (°C)"},
+                    legend={"x": 0, "y": 1},
+                    hovermode="closest",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font={"color": "white"},
+                ),
+            },
+            className="mt-4",
+        )
+
+        # Create energy consumption graph
+        energy_graph = dcc.Graph(
+            figure={
+                "data": [
+                    go.Bar(
+                        x=hours,
+                        y=energy_consumption,
+                        name="Energy Consumption",
+                        marker=dict(color="green")
+                    ),
+                ],
+                "layout": go.Layout(
+                    title="Hourly Energy Consumption",
+                    xaxis={"title": "Hour"},
+                    yaxis={"title": "Energy Consumption (kWh)"},
+                    legend={"x": 0, "y": 1},
+                    hovermode="closest",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font={"color": "white"},
+                ),
+            },
+            className="mt-4",
+        )
+
+        # Create heat flow graph
+        heat_flow_graph = dcc.Graph(
+            figure={
+                "data": [
+                    go.Scatter(
+                        x=hours,
+                        y=Q_heating,
+                        mode="lines+markers",
+                        name="Heat Pump Output",
+                        line=dict(color="red")
+                    ),
+                    go.Scatter(
+                        x=hours,
+                        y=Q_loss,
+                        mode="lines+markers",
+                        name="Heat Loss",
+                        line=dict(color="purple")
+                    ),
+                ],
+                "layout": go.Layout(
+                    title="Heat Pump Output vs. Heat Loss",
+                    xaxis={"title": "Hour"},
+                    yaxis={"title": "Heat Flow (kWh)"},
+                    legend={"x": 0, "y": 1},
+                    hovermode="closest",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font={"color": "white"},
+                ),
             },
             className="mt-4",
         )
@@ -167,49 +323,10 @@ class EnergySimulationDashboard:
         return html.Div(
             className="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-sm",
             children=[
-                html.Div(
-                    className="flex items-center space-x-4 mb-4",
-                    children=[
-                        html.Img(src=weather_icon_url, className="w-12 h-12"),
-                        html.Div(
-                            children=[
-                                html.H3(f"{location_name}", className="text-lg font-semibold text-green-400"),
-                                html.P(weather_description.capitalize(), className="text-sm text-green-300"),
-                            ]
-                        ),
-                    ],
-                ),
-                html.Div(
-                    className="grid grid-cols-2 gap-6 text-sm text-gray-300 mb-4",
-                    children=[
-                        html.Div([
-                            html.P("Temperature:", className="font-semibold text-green-200"),
-                            html.P(f"{temperature} °C", className="text-xl font-bold text-yellow-300")
-                        ]),
-                        html.Div([
-                            html.P("Humidity:", className="font-semibold text-green-200"),
-                            html.Div(
-                                className="relative pt-1",
-                                children=[
-                                    html.Div(
-                                        style={"width": f"{humidity}%", "backgroundColor": "#4fd1c5"},
-                                        className="h-2 rounded bg-teal-400",
-                                    ),
-                                    html.Span(f"{humidity}%", className="text-xs text-gray-400")
-                                ]
-                            )
-                        ]),
-                        html.Div([
-                            html.P("Wind Speed:", className="font-semibold text-green-200"),
-                            html.P(f"{wind_speed} m/s", className="text-xl font-bold text-blue-300")
-                        ]),
-                        html.Div([
-                            html.P("Average Demand:", className="font-semibold text-green-200"),
-                            html.P(f"{avg_demand} kWh", className="text-xl font-bold text-pink-300")
-                        ]),
-                    ],
-                ),
-                demand_graph
+                html.H3(f"{location_name}", className="text-lg font-semibold text-green-400"),
+                temperature_graph,
+                energy_graph,
+                heat_flow_graph,
             ],
         )
 
@@ -232,7 +349,7 @@ class EnergySimulationDashboard:
                     ]
                 ),
                 html.P(
-                    f"Demand: {apartment['demand'][0].get('average_demand', 'N/A')} kWh",
+                    f"Energy Consumption: {sum(apartment['simulation']['energy_consumption']):.2f} kWh",
                     className="text-xs text-pink-300 text-center mt-2"
                 ),
                 html.Div(
@@ -265,11 +382,21 @@ class EnergySimulationDashboard:
             ],
             [
                 State("input-residents", "value"),
-                State("input-size", "value")
+                State("input-size", "value"),
+                State("input-length", "value"),
+                State("input-width", "value"),
+                State("input-wall-height", "value"),
+                State("input-glazing-ratio", "value"),
+                State("input-num-windows", "value"),
+                State("input-num-doors", "value"),
+                State("input-roof-type", "value"),
+                State("input-roof-pitch", "value"),
             ]
         )
         def handle_map_click_or_add_location(
-            click_data, n_clicks, toggle_n_clicks, gallery_clicks, residents, size
+            click_data, n_clicks, toggle_n_clicks, gallery_clicks,
+            residents, size, length, width, wall_height,
+            glazing_ratio, num_windows, num_doors, roof_type, roof_pitch
         ):
             # Default values for outputs
             markers = [
@@ -304,12 +431,38 @@ class EnergySimulationDashboard:
                 elif is_triggered_by("add-location-btn") and n_clicks and self.selected_location:
                     lat, lon = self.selected_location["lat"], self.selected_location["lng"]
                     location_name = get_location_name(lat, lon)
-                    demand_data = get_hourly_demand_data(lat, lon, residents, size)
 
-                    if not isinstance(demand_data, str):  # Check if demand data is valid
+                    # Prepare building parameters
+                    building_params = {
+                        'length': length,
+                        'width': width,
+                        'wall_height': wall_height,
+                        'glazing_ratio': glazing_ratio,
+                        'num_windows': num_windows,
+                        'num_doors': num_doors,
+                        'roof_type': roof_type,
+                        'roof_pitch': roof_pitch,
+                        # Use default values for U-values, materials, etc., or add inputs as needed
+                    }
+
+                    # Prepare heating system parameters
+                    heating_params = {
+                        'COP': 3.5,
+                        'min_Q_heating': 0,
+                        'max_Q_heating': 5,
+                        'temperature_setpoint': 20,
+                        'initial_temperature_inside': 18
+                    }
+
+                    # Run the heating simulation
+                    simulation_results = get_heating_simulation(
+                        lat, lon, building_params, heating_params
+                    )
+
+                    if 'error' not in simulation_results:
                         self.apartments.append({
                             "lat": lat, "lon": lon, "name": location_name,
-                            "residents": residents, "size": size, "demand": demand_data
+                            "residents": residents, "size": size, "simulation": simulation_results
                         })
                         # Update markers and reset selected location
                         self.selected_location = None
@@ -319,6 +472,9 @@ class EnergySimulationDashboard:
                             for apt in self.apartments
                         ]
                         disable_add_location = True  # Disable the button after adding
+                    else:
+                        # Handle error (e.g., display a message)
+                        pass
 
                 # Toggle between gallery and expanded views
                 elif is_triggered_by("toggle-view-btn"):
@@ -336,15 +492,12 @@ class EnergySimulationDashboard:
                 # Create forecast cards for expanded view, only showing the focused apartment's details
                 if self.expanded_view and self.focused_apartment:
                     forecast_cards = [
-                        self.create_forecast_card(
-                            self.focused_apartment["demand"][0],
-                            self.focused_apartment["name"]
-                        )
+                        self.create_forecast_card(self.focused_apartment)
                     ]
                 elif self.expanded_view:
                     # Display all apartments if there's no specific focus (edge case)
                     forecast_cards = [
-                        self.create_forecast_card(apt["demand"][0], apt["name"])
+                        self.create_forecast_card(apt)
                         for apt in self.apartments
                     ]
 

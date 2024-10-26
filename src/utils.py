@@ -160,3 +160,84 @@ def export_simulation_results(
             json.dump(data, f, indent=2)
 
     return data
+
+def load_building_config(config_path: str) -> Building:
+    """
+    Load building configuration from JSON file
+    
+    Example config file:
+    {
+        "building": {
+            "battery_capacity_kwh": 10.0,
+            "battery_max_power_kw": 5.0,
+            "num_occupants": 4,
+            "location": {
+                "address": "Sunnlandsskrenten 35b, 7032, Trondheim",
+                "coordinates": [63.4305, 10.3950]
+            },
+            "building_type": "residential",
+            "floor_area": 150.0,
+            "num_floors": 2,
+            "year_built": 2010,
+            "heating_type": "heat_pump"
+        },
+        "solar": {
+            "peak_power_kw": 7.0,
+            "azimuth_angle": 180,
+            "tilt_angle": 35,
+            "efficiency": 0.2,
+            "temp_coefficient": -0.4
+        },
+        "tariff": {
+            "fixed_rate": 1.0,
+            "time_of_use": true,
+            "peak_hours_rate": 2.0,
+            "peak_hours": [8, 20]
+        }
+    }
+    """
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        # Get coordinates from address if not provided
+        location = config['building']['location']
+        if 'coordinates' in location:
+            coordinates = tuple(location['coordinates'])
+        else:
+            coordinates = get_coordinates_from_adress(location['address'])
+        
+        # Create SolarSetup
+        solar = SolarSetup(
+            peak_power_kw=config['solar']['peak_power_kw'],
+            azimuth_angle=config['solar']['azimuth_angle'],
+            tilt_angle=config['solar']['tilt_angle'],
+            efficiency=config['solar']['efficiency'],
+            temp_coefficient=config['solar']['temp_coefficient']
+        )
+        
+        # Create GridTariff
+        tariff = GridTariff(
+            fixed_rate=config['tariff']['fixed_rate'],
+            time_of_use=config['tariff']['time_of_use'],
+            peak_hours_rate=config['tariff'].get('peak_hours_rate'),
+            peak_hours=tuple(config['tariff']['peak_hours']) if config['tariff'].get('peak_hours') else None
+        )
+        
+        # Create Building
+        return Building(
+            battery_capacity_kwh=config['building']['battery_capacity_kwh'],
+            battery_max_power_kw=config['building']['battery_max_power_kw'],
+            num_occupants=config['building']['num_occupants'],
+            location=coordinates,
+            building_type=BuildingType(config['building']['building_type']),
+            solar=solar,
+            tariff=tariff,
+            floor_area=config['building']['floor_area'],
+            num_floors=config['building']['num_floors'],
+            year_built=config['building']['year_built'],
+            heating_type=config['building']['heating_type']
+        )
+        
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        raise ValueError(f"Error loading building config: {str(e)}")

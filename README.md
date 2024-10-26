@@ -19,9 +19,15 @@ A Python simulator for building energy systems with solar panels and battery sto
 
 
 ## TODOs
-- make the whole thing run
-- fix flat battery soc
-- fix json export error
+
+- Make UI
+    - 
+
+- check that this can run in a docker container
+- add grid tariff of the building to the pricing calculation
+- add functionality for running a simulation with settings from a json file
+- 
+
 - improve solar simulation accuracy
 - Calcuation of saved costs with battery optimization vs not
     - add to export

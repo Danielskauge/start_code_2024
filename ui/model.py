@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 import logging
 from typing import Dict, List, Union, Optional
+from heatModule.buildingHeatLoss import BuildingHeatLoss
+from heatModule.heatingModule import HeatingSystem
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -45,62 +47,52 @@ def get_location_name(lat: float, lon: float) -> str:
     except requests.RequestException as e:
         logger.error(f"Geocoding failed: {e}")
         return "Unknown Location"
-
-class CRESTDemandModel:
-    """CREST domestic electricity demand model."""
-    
-    def __init__(self):
-        self.base_temp = 20
-        self.temp_factor = 1.5
-        self.cloud_factor = 0.5
-        self.resident_factor = 1.5
-        self.size_factor = 0.1
-
-    def calculate_demand(self, weather_data: Dict, residents: int, apartment_size: float) -> List[Dict]:
-        """Calculate 24-hour demand forecast."""
-        if not weather_data:
-            return [{"day": "Today", "error": "Weather data unavailable"}]
-
-        day_data = {
-            "day": "Today",
-            "hourly_demand": [],
-            "average_demand": None
-        }
-
-        day_weather = [
-            entry['data']['instant']['details']
-            for entry in weather_data['properties']['timeseries'][:24]
-        ]
-
-        daily_demand = []
-
-        for hour, weather in enumerate(day_weather):
-            temp = weather.get("air_temperature", 15)
-            cloud_cover = weather.get("cloud_area_fraction", 50)
-            
-            base_demand = self.temp_factor * max(0, self.base_temp - temp)
-            cloud_demand = self.cloud_factor * cloud_cover / 100
-            resident_demand = self.resident_factor * residents
-            size_demand = self.size_factor * apartment_size
-            
-            demand = max(0, base_demand + cloud_demand + resident_demand + size_demand)
-            
-            day_data["hourly_demand"].append({
-                "time": f"{hour:02}:00",
-                "demand": f"{demand:.2f} kWh"
-            })
-            daily_demand.append(demand)
-
-        if daily_demand:
-            day_data["average_demand"] = f"{sum(daily_demand) / len(daily_demand):.2f} kWh"
-        
-        return [day_data]
-
-def get_hourly_demand_data(lat: float, lon: float, residents: int, apartment_size: float) -> Union[List[Dict], str]:
-    """Get hourly demand forecast for given location and parameters."""
+def get_heating_simulation(
+    lat: float, 
+    lon: float, 
+    building_params: Dict, 
+    heating_params: Dict
+) -> Dict:
+    """Run the heating simulation using the new models."""
+    # Fetch weather data
     weather_data = get_weather_data(lat, lon)
     if weather_data is None:
-        return "Weather data unavailable."
+        return {"error": "Weather data unavailable."}
     
-    model = CRESTDemandModel()
-    return model.calculate_demand(weather_data, residents, apartment_size)
+    # Extract outside temperatures for the next 24 hours
+    temperatures_outside = [
+        entry['data']['instant']['details'].get('air_temperature', 15)
+        for entry in weather_data['properties']['timeseries'][:24]
+    ]
+    
+    # Initialize the BuildingHeatLoss instance with provided parameters
+    building = BuildingHeatLoss(**building_params)
+    
+    # Initialize the HeatingSystem instance
+    heating_system = HeatingSystem(
+        building=building,
+        COP=heating_params.get('COP', 3.5),
+        min_Q_heating=heating_params.get('min_Q_heating', 0),
+        max_Q_heating=heating_params.get('max_Q_heating', 5)
+    )
+    
+    # Define temperature setpoints (assuming constant setpoint)
+    temperature_setpoints = [heating_params.get('temperature_setpoint', 20)] * 24
+    
+    # Run the simulation
+    temperatures_inside, energy_consumption, Q_heating, Q_loss = heating_system.simulate_heating(
+        temperatures_outside,
+        temperature_setpoints,
+        heating_params.get('initial_temperature_inside', 18)
+    )
+    
+    # Prepare the results
+    results = {
+        'temperatures_inside': temperatures_inside,
+        'temperatures_outside': temperatures_outside,
+        'energy_consumption': energy_consumption,
+        'Q_heating': Q_heating,
+        'Q_loss': Q_loss
+    }
+    
+    return results
