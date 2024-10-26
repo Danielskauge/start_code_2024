@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union
+from typing import Union, List, Tuple
 MINUTES_IN_A_DAY = 24 * 60
 
 
@@ -22,7 +22,22 @@ class ApplianceStatistics:
 
     def sample_load_profile(self,
                             resolution: int,
-                            occupancy: np.ndarray) -> np.ndarray:
+                            occupancy: np.ndarray,
+                            inactive_occupancy_times: List[Tuple[int, int]]
+                            = [(0, int(60*7)), (int(60*23), int(60*24))]) -> np.ndarray:
+        """
+        Args:
+            resolution: Resolution of the load profile in minutes
+            occupancy: Occupancy profile for the day. Number of occupants in the house at each time step. 
+                Resolution of the occupancy profile should be the same as the resolution of the load profile.
+            inactive_occupancy_times: List of tuples of start and end times of inactive occupancy periods(in minutes). 
+                I.e when occupants are sleeping.
+        """
+        activity_mask = np.ones(MINUTES_IN_A_DAY//resolution)
+        for start, end in inactive_occupancy_times:
+            activity_mask[start//resolution:end//resolution] = 0
+        # Mask out the inactive occupancy times
+        occupancy = occupancy*activity_mask
         usage_profile = self.sample_usage_profile(resolution, occupancy)
         load_profile = usage_profile*self.average_load_per_minute*resolution
         return load_profile
@@ -126,30 +141,6 @@ class OvenStatistics(ApplianceStatistics):
         self.min_time_between_restart = 0
         # average energy consumption per minute (kWh)
         self.average_load_per_minute = 1000*60/(1e3*3600)
-
-
-class HeatingStatistics(ApplianceStatistics):
-    def __init__(self):
-        self.name = "Heating"
-    """
-    Heating is handled a bit differently in our simulation.
-    We assume that the heating is always on when the occupancy is 1 or more.
-    Heating being "on" means that the temperature is maintained at a desired level(23 deg C).
-    Heating being "off" means that the temperature is maintained at a lower level(17 deg C).
-    The load is determined fully by the physical model of the building.
-    """
-
-    def sample_usage_profile(self,
-                             resolution: int,
-                             occupancy: np.ndarray) -> np.ndarray:
-        # Assume heating to desired temperature is always on when occupancy is 1 or more
-        usage_profile = np.where(occupancy >= 1, 1, 0)
-        return usage_profile
-
-    def sample_load_profile(self,
-                            resolution: int,
-                            occupancy: np.ndarray) -> np.ndarray:
-        raise NotImplementedError("Heating does not have a load profile")
 
 
 class ShowerStatistics(ApplianceStatistics):
