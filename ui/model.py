@@ -4,6 +4,14 @@ import logging
 from typing import Dict, Optional, List
 from heatModule.buildingHeatLoss import BuildingHeatLoss
 from heatModule.heatingModule import HeatingSystem
+# Import appliance models
+from appliance.appliance import (
+    DishWasherStatistics,
+    WashingMachineStatistics,
+    TumbleDryerStatistics,
+    OvenStatistics
+)
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -47,14 +55,37 @@ def get_location_name(lat: float, lon: float) -> str:
         logger.error(f"Geocoding failed: {e}")
         return "Unknown Location"
 
+def get_appliance_consumption(occupant_profile: List[int]) -> Dict[str, List[float]]:
+    """Simulate appliance energy consumption based on occupant profile."""
+    resolution = 60  # minutes
+    occupancy = np.array(occupant_profile)
+    
+    appliances = [
+        ('Dish Washer', DishWasherStatistics()),
+        ('Washing Machine', WashingMachineStatistics()),
+        ('Tumble Dryer', TumbleDryerStatistics()),
+        ('Oven', OvenStatistics())
+    ]
+    
+    appliance_load_profiles = {}
+    for name, appliance in appliances:
+        load_profile = appliance.sample_load_profile(
+            resolution=resolution,
+            occupancy=occupancy
+        )
+        appliance_load_profiles[name] = load_profile.tolist()
+        
+    return appliance_load_profiles
+
 def get_heating_simulation(
     lat: float, 
     lon: float, 
     building_params: Dict, 
     heating_params: Dict,
-    occupant_profile: List[int]
+    occupant_profile: List[int],
+    include_appliances: bool = True
 ) -> Dict:
-    """Run the heating simulation using the new models."""
+    """Run the heating and appliance simulation using the new models."""
     # Fetch weather data
     weather_data = get_weather_data(lat, lon)
     if weather_data is None:
@@ -84,19 +115,41 @@ def get_heating_simulation(
     # Assuming each occupant generates 100W of heat
     internal_heat_gains = [occupants * 0.1 for occupants in occupant_profile]  # Convert W to kW
     
-    # Run the simulation
-    temperatures_inside, energy_consumption, Q_heating, Q_loss = heating_system.simulate_heating(
+    # Run the heating simulation
+    temperatures_inside, energy_consumption_heating, Q_heating, Q_loss = heating_system.simulate_heating(
         temperatures_outside,
         temperature_setpoints,
         heating_params.get('initial_temperature_inside', 18),
         internal_heat_gains=internal_heat_gains
     )
     
+    # Run the appliance simulation
+    if include_appliances:
+        appliance_energy_consumption = get_appliance_consumption(occupant_profile)
+    else:
+        # Initialize zero profiles for each appliance
+        appliance_names = ['Dish Washer', 'Washing Machine', 'Tumble Dryer', 'Oven']
+        appliance_energy_consumption = {name: [0]*24 for name in appliance_names}
+    
+    # Sum up the appliance consumptions to get total appliance consumption
+    total_appliance_consumption = [
+        sum(appliance_energy_consumption[name][i] for name in appliance_energy_consumption)
+        for i in range(24)
+    ]
+    
+    # Combine energy consumptions
+    total_energy_consumption = [
+        heating + appliance_total
+        for heating, appliance_total in zip(energy_consumption_heating, total_appliance_consumption)
+    ]
+    
     # Prepare the results
     results = {
         'temperatures_inside': temperatures_inside,
         'temperatures_outside': temperatures_outside,
-        'energy_consumption': energy_consumption,
+        'energy_consumption_heating': energy_consumption_heating,
+        'energy_consumption_appliances': appliance_energy_consumption,  # Now a dict
+        'total_energy_consumption': total_energy_consumption,
         'Q_heating': Q_heating,
         'Q_loss': Q_loss
     }
