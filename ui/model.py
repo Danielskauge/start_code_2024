@@ -104,4 +104,3 @@ def get_hourly_demand_data(lat: float, lon: float, residents: int, apartment_siz
     
     model = CRESTDemandModel()
     return model.calculate_demand(weather_data, residents, apartment_size)
-
