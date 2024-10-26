@@ -13,6 +13,7 @@ class EnergySimulationDashboard:
         self.app = dash.Dash(__name__)
         self.apartments = []
         self.selected_location = None
+        self.expanded_view = False
         self.focused_apartment = None
 
         # Initialize layout and callbacks
@@ -46,7 +47,7 @@ class EnergySimulationDashboard:
     def create_sidebar(self):
         """Create sidebar with map and settings."""
         return html.Div(
-            className="sticky top-0 w-1/4 h-screen p-4 bg-gray-800 shadow-lg border-r border-gray-700 flex flex-col space-y-6",
+            className="sticky top-0 w-1/4 h-screen p-4 bg-gray-800 shadow-lg border-r border-gray-600 flex flex-col space-y-6",
             children=[
                 html.H2("Map & Settings", className="text-2xl font-bold text-green-300 mb-2 uppercase tracking-wide"),
                 self.create_map_container(),
@@ -57,7 +58,7 @@ class EnergySimulationDashboard:
     def create_map_container(self):
         """Create the map component."""
         return html.Div(
-            className="h-1/2 rounded-lg overflow-hidden shadow-lg bg-gray-900 border border-gray-800",
+            className="h-1/2 rounded-lg overflow-hidden shadow-md bg-gray-900 border border-gray-700",
             children=[
                 dl.Map(
                     center=[60.472, 8.4689],
@@ -75,7 +76,7 @@ class EnergySimulationDashboard:
     def create_settings_panel(self):
         """Create the settings panel with input controls."""
         return html.Div(
-            className="flex-1 p-4 bg-gray-800 rounded-lg border border-gray-700 shadow-inner",
+            className="flex-1 p-4 bg-gray-700 rounded-lg border border-gray-600 shadow-inner",
             children=[
                 html.H3("Apartment Settings", className="text-lg font-semibold text-green-200 mb-2"),
                 html.Label("Number of Residents:", className="text-gray-300 text-sm"),
@@ -86,7 +87,7 @@ class EnergySimulationDashboard:
                     min=1,
                     max=10,
                     step=1,
-                    className="w-full p-2 mb-4 bg-gray-600 rounded",
+                    className="w-full p-1 mb-4",
                     style={'color': 'black'}
                 ),
                 html.Label("Apartment Size (m²):", className="text-gray-300 text-sm"),
@@ -97,13 +98,13 @@ class EnergySimulationDashboard:
                     min=20,
                     max=200,
                     step=5,
-                    className="w-full p-2 mb-4 bg-gray-600 rounded",
+                    className="w-full p-1 mb-4",
                     style={'color': 'black'}
                 ),
                 html.Button(
                     "Add Location",
                     id="add-location-btn",
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300 mt-4",
+                    className="bg-green-500 text-white font-bold py-2 px-4 rounded mt-4",
                     disabled=True
                 )
             ]
@@ -116,10 +117,9 @@ class EnergySimulationDashboard:
             children=[
                 html.H2("Electricity Demand Simulation", className="text-2xl font-semibold text-green-300 mb-4"),
                 html.Button(
-                    "Back to All Locations",
-                    id="back-btn",
-                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-300 mb-4",
-                    style={"display": "none"}  # Hidden by default
+                    "Switch to Gallery View" if self.expanded_view else "Switch to Card View",
+                    id="toggle-view-btn",
+                    className="bg-blue-500 text-white font-bold py-2 px-4 rounded mb-4"
                 ),
                 html.Div(id="forecast-info", className="space-y-4"),
                 html.Div(id="gallery", className="flex flex-wrap gap-4 mt-4")
@@ -165,7 +165,7 @@ class EnergySimulationDashboard:
         )
 
         return html.Div(
-            className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-lg border border-gray-600 shadow-md",
+            className="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-sm",
             children=[
                 html.Div(
                     className="flex items-center space-x-4 mb-4",
@@ -216,7 +216,7 @@ class EnergySimulationDashboard:
     def create_gallery_card(self, apartment):
         """Create a smaller card for gallery view with a house icon."""
         return html.Div(
-            className="w-52 h-60 bg-gradient-to-br from-gray-700 to-gray-600 p-4 rounded-lg border border-gray-600 shadow-md flex flex-col items-center justify-center cursor-pointer hover:bg-gray-600 transition duration-300",
+            className="w-52 h-60 bg-gray-700 p-4 rounded-lg border border-gray-600 shadow-sm flex flex-col items-center justify-center cursor-pointer hover:bg-gray-600 transition duration-300",
             children=[
                 html.H3(
                     apartment["name"], 
@@ -255,13 +255,13 @@ class EnergySimulationDashboard:
                 Output("add-location-btn", "disabled"),
                 Output("forecast-info", "children"),
                 Output("gallery", "children"),
-                Output("back-btn", "style"),
+                Output("toggle-view-btn", "children")
             ],
             [
                 Input("map", "clickData"),
                 Input("add-location-btn", "n_clicks"),
-                Input({"type": "gallery-card", "index": ALL}, "n_clicks"),
-                Input("back-btn", "n_clicks")
+                Input("toggle-view-btn", "n_clicks"),
+                Input({"type": "gallery-card", "index": ALL}, "n_clicks")
             ],
             [
                 State("input-residents", "value"),
@@ -269,7 +269,7 @@ class EnergySimulationDashboard:
             ]
         )
         def handle_map_click_or_add_location(
-            click_data, n_clicks, gallery_clicks, back_n_clicks, residents, size
+            click_data, n_clicks, toggle_n_clicks, gallery_clicks, residents, size
         ):
             # Default values for outputs
             markers = [
@@ -278,18 +278,20 @@ class EnergySimulationDashboard:
                 for apt in self.apartments
             ]
             forecast_cards = []
-            gallery_cards = []
+            gallery_cards = [
+                self.create_gallery_card(apt) for apt in self.apartments
+            ]
             disable_add_location = True
-            show_back_btn = {"display": "none"}  # Default to hiding back button
+            toggle_button_text = "Switch to Gallery View" if self.expanded_view else "Switch to Card View"
             ctx = callback_context
 
-            # Helper function to identify the triggered input
+            # Helper functions to identify the triggered input
             def is_triggered_by(prop):
-                return any(prop in trigger["prop_id"] for trigger in ctx.triggered)
+                return any(prop in triggered_id for triggered_id in ctx.triggered_prop_ids)
 
             try:
                 # Map click handling - enables adding a new location
-                if is_triggered_by("map") and click_data and click_data.get("latlng"):
+                if is_triggered_by("map") and click_data and "latlng" in click_data:
                     self.selected_location = click_data["latlng"]
                     preview_marker = dl.Marker(
                         position=(self.selected_location["lat"], self.selected_location["lng"]),
@@ -317,35 +319,39 @@ class EnergySimulationDashboard:
                             for apt in self.apartments
                         ]
                         disable_add_location = True  # Disable the button after adding
-                        self.focused_apartment = None  # Exit expanded view when a new location is added
+
+                # Toggle between gallery and expanded views
+                elif is_triggered_by("toggle-view-btn"):
+                    self.expanded_view = not self.expanded_view
+                    self.focused_apartment = None if not self.expanded_view else self.focused_apartment
 
                 # Handle gallery card clicks to focus on a specific apartment
                 elif is_triggered_by("gallery-card"):
-                    clicked_indices = [i for i, clicked in enumerate(gallery_clicks) if clicked]
-                    if clicked_indices:
-                        clicked_index = clicked_indices[0]
-                        self.focused_apartment = self.apartments[clicked_index]
-                        forecast_cards = [
-                            self.create_forecast_card(
-                                self.focused_apartment["demand"][0],
-                                self.focused_apartment["name"]
-                            )
-                        ]
-                        show_back_btn = {"display": "block"}
+                    clicked_index = ctx.triggered_prop_ids[0].split(".")[0].split(":")[-1].strip('"')
+                    self.focused_apartment = next(
+                        (apt for apt in self.apartments if apt["name"] == clicked_index), None
+                    )
+                    self.expanded_view = True
 
-                # Handle back button to return to gallery view
-                elif is_triggered_by("back-btn"):
-                    self.focused_apartment = None
-
-                # If not focused on any apartment, show all gallery cards
-                if not self.focused_apartment:
-                    forecast_cards = []
-                    gallery_cards = [
-                        self.create_gallery_card(apt) for apt in self.apartments
+                # Create forecast cards for expanded view, only showing the focused apartment's details
+                if self.expanded_view and self.focused_apartment:
+                    forecast_cards = [
+                        self.create_forecast_card(
+                            self.focused_apartment["demand"][0],
+                            self.focused_apartment["name"]
+                        )
                     ]
-                    show_back_btn = {"display": "none"}
+                elif self.expanded_view:
+                    # Display all apartments if there's no specific focus (edge case)
+                    forecast_cards = [
+                        self.create_forecast_card(apt["demand"][0], apt["name"])
+                        for apt in self.apartments
+                    ]
 
-                return markers, disable_add_location, forecast_cards, gallery_cards, show_back_btn
+                # Prepare gallery cards only if not in expanded view
+                gallery_cards = [self.create_gallery_card(apt) for apt in self.apartments] if not self.expanded_view else []
+
+                return markers, disable_add_location, forecast_cards, gallery_cards, toggle_button_text
 
             except KeyError as e:
                 logger.error(f"KeyError: Missing data key - {e}")
@@ -353,7 +359,7 @@ class EnergySimulationDashboard:
                 logger.error(f"Callback error: {e}")
 
             # Return defaults in case of error
-            return markers, True, forecast_cards, gallery_cards, {"display": "none"}
+            return markers, True, forecast_cards, gallery_cards, toggle_button_text
 
     def run(self):
         """Run the dashboard server."""
