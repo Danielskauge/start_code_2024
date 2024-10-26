@@ -65,6 +65,21 @@ def main():
         solar_generation_tomorrow
     )
     
+    # Create results directory if it doesn't exist
+    import os
+    os.makedirs("results", exist_ok=True)
+    
+    # Export results
+    export_simulation_results(
+        weather_forecast_tomorrow['timestamp'],  # Pass just the timestamps list
+        consumption_tomorrow,
+        solar_generation_tomorrow,
+        soc,
+        grid,
+        spot_prices_tomorrow,
+        "results/results.json"
+    )
+    
     # Visualize results
     plot_energy_flow(
         weather_forecast_tomorrow['timestamp'],
@@ -74,17 +89,6 @@ def main():
         grid,
         spot_prices_tomorrow
     )
-    
-    export_simulation_results(
-        weather_forecast_tomorrow,
-        consumption_tomorrow,
-        solar_generation_tomorrow,
-        soc,
-        grid,
-        spot_prices_tomorrow,
-        "results/results.json"
-    )
-    
 
 if __name__ == "__main__":
     main()

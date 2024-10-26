@@ -63,63 +63,38 @@ class WeatherData:
     def _process_timeseries(self, data: Dict, lat: float, lon: float) -> Dict[str, List]:
         """Process raw API data into structured timeseries for next day"""
         tomorrow = datetime.now().date() + timedelta(days=1)
-        start_time = datetime.combine(tomorrow, datetime.min.time())
         
-        timeseries = data['properties']['timeseries']
+        # Create list of all hours for tomorrow
+        hours = []
+        for hour in range(24):
+            hours.append(datetime.combine(tomorrow, datetime.min.time()) + timedelta(hours=hour))
+        
         result = {
-            'timestamp': [],
-            'temperature': [],
-            'cloud_cover': [],
-            'wind_speed': [],
-            'humidity': [],
-            'precipitation': [],
-            'pressure': []
+            'timestamp': hours,
+            'temperature': [0] * 24,
+            'cloud_cover': [0] * 24,
+            'wind_speed': [0] * 24,
+            'humidity': [0] * 24,
+            'precipitation': [0] * 24,
+            'pressure': [0] * 24
         }
         
-        # Filter and process only next day's data
-        for entry in timeseries:
+        # Map API data to our hourly structure
+        for entry in data['properties']['timeseries']:
             time = datetime.fromisoformat(entry['time'].replace('Z', '+00:00'))
             if time.date() == tomorrow:
+                hour = time.hour
                 instant = entry['data']['instant']['details']
                 
-                result['timestamp'].append(time)
-                result['temperature'].append(instant.get('air_temperature', 0))
-                result['cloud_cover'].append(instant.get('cloud_area_fraction', 0))
-                result['wind_speed'].append(instant.get('wind_speed', 0))
-                result['humidity'].append(instant.get('relative_humidity', 0))
-                result['pressure'].append(instant.get('air_pressure_at_sea_level', 0))
+                result['temperature'][hour] = instant.get('air_temperature', 0)
+                result['cloud_cover'][hour] = instant.get('cloud_area_fraction', 0)
+                result['wind_speed'][hour] = instant.get('wind_speed', 0)
+                result['humidity'][hour] = instant.get('relative_humidity', 0)
+                result['pressure'][hour] = instant.get('air_pressure_at_sea_level', 0)
                 
                 # Get precipitation for next hour
                 precip = entry['data'].get('next_1_hours', {}).get('details', {}).get('precipitation_amount', 0)
-                result['precipitation'].append(precip)
+                result['precipitation'][hour] = precip
         
         return result
 
-    def _generate_synthetic_data(self) -> Dict[str, List]:
-        """Generate synthetic weather data for testing"""
-        now = datetime.now().replace(minute=0, second=0, microsecond=0)
-        result = {
-            'timestamp': [],
-            'temperature': [],
-            'irradiance': [],
-            'cloud_cover': [],
-            'wind_speed': [],
-            'humidity': [],
-            'precipitation': [],
-            'pressure': []
-        }
-        
-        for i in range(24):
-            time = now + timedelta(hours=i)
-            hour = time.hour
-            
-            result['timestamp'].append(time)
-            result['temperature'].append(20 + 5 * np.sin(i * np.pi/12))
-            result['irradiance'].append(max(0, np.sin(i * np.pi/12) * 1000))
-            result['cloud_cover'].append(np.random.uniform(0, 100))
-            result['wind_speed'].append(np.random.uniform(0, 10))
-            result['humidity'].append(np.random.uniform(30, 90))
-            result['precipitation'].append(max(0, np.random.normal(0, 0.5)))
-            result['pressure'].append(1013 + np.random.normal(0, 5))
-            
-        return result
