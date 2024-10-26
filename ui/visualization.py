@@ -317,6 +317,7 @@ class EnergySimulationDashboard:
                             for apt in self.apartments
                         ]
                         disable_add_location = True  # Disable the button after adding
+                        self.focused_apartment = None  # Exit expanded view when a new location is added
 
                 # Handle gallery card clicks to focus on a specific apartment
                 elif is_triggered_by("gallery-card"):
