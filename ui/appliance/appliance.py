@@ -23,9 +23,8 @@ class ApplianceStatistics:
     def sample_load_profile(self,
                             resolution: int,
                             occupancy: np.ndarray,
-                            inactive_occupancy_times:
-                                List[Tuple[int, int]] =
-                                [(0, int(60*7), (60*23, 60*24))]) -> np.ndarray:
+                            inactive_occupancy_times: List[Tuple[int, int]]
+                            = [(0, int(60*7)), (int(60*23), int(60*24))]) -> np.ndarray:
         """
         Args:
             resolution: Resolution of the load profile in minutes
