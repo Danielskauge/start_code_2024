@@ -3,6 +3,19 @@ import requests
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 
+import logging
+from functools import lru_cache
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Constants
+MET_API_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
+HEADERS = {
+    "User-Agent": "EnergyDashboard/1.0 (auxillium-reborn@gmail.com)"
+}
+
 
 def get_spot_prices(area: str = 'NO3', include_vat: bool = True) -> List[float]:
     """
@@ -69,6 +82,23 @@ def get_spot_prices(area: str = 'NO3', include_vat: bool = True) -> List[float]:
         raise ValueError(f"Error parsing spot price data: {e}")
 
 
+@lru_cache(maxsize=100)
+def get_location_name(lat: float, lon: float) -> str:
+    """Fetches location name via Nominatim."""
+    url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": HEADERS["User-Agent"]},
+            timeout=5
+        )
+        response.raise_for_status()
+        return response.json().get("display_name", "Unknown Location")
+    except requests.RequestException as e:
+        logger.error(f"Geocoding failed: {e}")
+        return "Unknown Location"
+
+
 def get_price_area_from_location(lat: float, lon: float) -> str:
     """
     Determine price area based on coordinates
@@ -97,9 +127,9 @@ class WeatherData:
     """Weather data handler for Yr API"""
 
     def __init__(self):
-        self.base_url = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
+        self.base_url = MET_API_URL
         self.headers = {
-            'User-Agent': 'BuildingEnergySimulator/1.0 (danielrs@stud.ntnu.no)',
+            'User-Agent': HEADERS['User-Agent'],
             'Accept': 'application/json',
             'Accept-Encoding': 'gzip, deflate'
         }
