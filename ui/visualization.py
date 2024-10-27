@@ -6,6 +6,9 @@ import logging
 from dash.dependencies import Input, Output, State, ALL
 from model import get_heating_simulation, get_location_name
 import numpy as np
+import sys
+sys.path.append('/Users/danielskauge/start_code_2024')
+from src.simulation import run_full_simulation
 
 logger = logging.getLogger(__name__)
 
@@ -595,10 +598,12 @@ class EnergySimulationDashboard:
                         'initial_temperature_inside': 18
                     }
 
-                    simulation_results = get_heating_simulation(
+                    simulation_results = run_full_simulation(
                         lat, lon, building_params, heating_params,
                         occupant_profile=occupant_profile,
-                        include_appliances=include_appliances
+                        include_appliances=include_appliances,
+                        solar_setup=None,
+                        battery_setup=None
                     )
 
                     if 'error' not in simulation_results:
@@ -649,11 +654,13 @@ class EnergySimulationDashboard:
                         # Re-run simulation with new max_Q_heating value
                         heating_params = self.current_apartment.get('heating_params', {})
                         heating_params['max_Q_heating'] = max_Q_heating  # Update max_Q_heating
-                        simulation_results = get_heating_simulation(
+                        simulation_results = run_full_simulation(
                             self.current_apartment['lat'], self.current_apartment['lon'],
                             building_params, heating_params,
                             occupant_profile=occupant_profile,
-                            include_appliances=include_appliances
+                            include_appliances=include_appliances,
+                            solar_setup=None,
+                            battery_setup=None
                         )
                         self.current_apartment['simulation'] = simulation_results
                         forecast_cards = [self.create_forecast_card(self.current_apartment, expanded=True)]
