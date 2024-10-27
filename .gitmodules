@@ -1,3 +1,0 @@
-[submodule "src/optimizer"]
-	path = src/optimizer
-	url = git@github.com:enmo-solutions/code24-case2.git
