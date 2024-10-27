@@ -1,5 +1,5 @@
 from typing import List
-from heatModule.buildingHeatLoss import BuildingHeatLoss
+from ui.heatModule.buildingHeatLoss import BuildingHeatLoss
 
 class HeatingSystem:
     def __init__(self, building: BuildingHeatLoss, COP: float, min_Q_heating: float, max_Q_heating: float, controller:str = "PID"):

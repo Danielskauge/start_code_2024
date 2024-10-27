@@ -1,11 +1,13 @@
+import sys
+sys.path.append('/Users/danielskauge/start_code_2024')
 import requests
 from functools import lru_cache
 import logging
 from typing import Dict, Optional, List
-from heatModule.buildingHeatLoss import BuildingHeatLoss
-from heatModule.heatingModule import HeatingSystem
+from ui.heatModule.buildingHeatLoss import BuildingHeatLoss
+from ui.heatModule.heatingModule import HeatingSystem
 # Import appliance models
-from appliance.appliance import (
+from ui.appliance.appliance import (
     DishWasherStatistics,
     WashingMachineStatistics,
     TumbleDryerStatistics,
@@ -78,24 +80,15 @@ def get_appliance_consumption(occupant_profile: List[int]) -> Dict[str, List[flo
     return appliance_load_profiles
 
 def get_heating_simulation(
-    lat: float, 
-    lon: float, 
+    weather_data: Dict[str, List],
     building_params: Dict, 
     heating_params: Dict,
     occupant_profile: List[int],
     include_appliances: bool = True
 ) -> Dict:
     """Run the heating and appliance simulation using the new models."""
-    # Fetch weather data
-    weather_data = get_weather_data(lat, lon)
-    if weather_data is None:
-        return {"error": "Weather data unavailable."}
-    
     # Extract outside temperatures for the next 24 hours
-    temperatures_outside = [
-        entry['data']['instant']['details'].get('air_temperature', 15)
-        for entry in weather_data['properties']['timeseries'][:24]
-    ]
+    temperatures_outside = weather_data['temperature']
     
     # Initialize the BuildingHeatLoss instance with provided parameters
     building = BuildingHeatLoss(**building_params)
