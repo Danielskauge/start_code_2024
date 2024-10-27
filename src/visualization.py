@@ -6,6 +6,7 @@ import logging
 from dash.dependencies import Input, Output, State, ALL
 from simulation import get_heating_simulation, get_location_name
 import numpy as np
+import requests  # Import to handle API requests
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,13 @@ class EnergySimulationDashboard:
         self.selected_location = None
         self.expanded_view = False
         self.current_apartment = None  # New property to track current apartment
+        self.client_locations = []  # Store fetched client data
+
 
         # Initialize layout and callbacks
         self.setup_layout()
         self.setup_callbacks()
+        self.fetch_client_data() 
 
     def setup_layout(self):
         """Setup the dashboard layout."""
@@ -61,14 +65,21 @@ class EnergySimulationDashboard:
         return html.Div(
             className="lg:w-1/4 bg-gray-800 shadow-lg border-r border-gray-700 flex flex-col",
             children=[
-                html.Div(
-                    className="p-4 border-b border-gray-700",
-                    children=[
-                        html.H2(
-                            "Energy Simulation", className="text-2xl font-bold text-green-300 mb-2"),
-                        html.P("Configure your settings and visualize energy consumption.",
-                               className="text-gray-400 text-sm"),
-                    ]
+                    html.Div(
+                        className="p-4 border-b border-gray-700",
+                        children=[
+                            html.H2(
+                                "Energy Simulation", className="text-2xl font-bold text-green-300 mb-2"),
+                            html.P("Configure your settings and visualize energy consumption.",
+                                className="text-gray-400 text-sm"),
+                            html.A(
+                                [html.I(className="fas fa-external-link-alt mr-2"),
+                                "Go to Dashboard"],
+                                href="https://dashboard.vps2.martindata.no/",
+                                target="_blank",
+                                className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center"
+                            ),
+                        ]
                 ),
                 html.Div(
                     className="flex-1 overflow-y-auto",
@@ -79,6 +90,61 @@ class EnergySimulationDashboard:
                 )
             ]
         )
+    
+    def fetch_client_data(self):
+        """Fetch client data from the external API and create cards."""
+        try:
+            response = requests.get("https://dashboard.vps2.martindata.no/get_clients")
+            if response.status_code == 200:
+                self.client_locations = response.json()
+                for client in self.client_locations:
+                    # Create an apartment-like object for each client location
+                    lat = float(client["latitude"])
+                    lon = float(client["longitude"])
+                    location_name = client["Name"]
+                    
+                    # Set up default parameters for the simulation
+                    building_params = {
+                        'length': 10,
+                        'width': 8,
+                        'wall_height': 2.5,
+                        'glazing_ratio': 0.15,
+                        'num_windows': 4,
+                        'num_doors': 1,
+                        'roof_type': 'gable',
+                        'roof_pitch': 35,
+                    }
+                    heating_params = {
+                        'COP': 3.5,
+                        'min_Q_heating': 0,
+                        'max_Q_heating': 5,
+                        'temperature_setpoint': 20,
+                        'initial_temperature_inside': 18
+                    }
+                    # Placeholder simulation result (can be updated upon user request)
+                    simulation_results = get_heating_simulation(
+                        lat, lon, building_params, heating_params,
+                        occupant_profile=[2 if 6 <= i < 8 or 18 <= i < 22 else 0 for i in range(24)],
+                        include_appliances=True
+                    )
+                    
+                    # Create a new apartment entry for the fetched client
+                    apartment = {
+                        "id": len(self.apartments),  # Unique ID
+                        "lat": lat, "lon": lon, "name": location_name,
+                        "residents": 2, "size": 50,
+                        "building_params": building_params,
+                        "heating_params": heating_params,
+                        "occupant_profile": [2 if 6 <= i < 8 or 18 <= i < 22 else 0 for i in range(24)],
+                        "include_appliances": True,
+                        "simulation": simulation_results
+                    }
+                    
+                    self.apartments.append(apartment)
+            else:
+                logger.error(f"Failed to fetch client data: {response.status_code}")
+        except Exception as e:
+            logger.exception("Error fetching client data.")
 
     def create_map_container(self):
         """Create the map component."""
@@ -96,7 +162,8 @@ class EnergySimulationDashboard:
                             children=[
                                 dl.TileLayer(
                                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"),
-                                dl.LayerGroup(id="layer")
+                                dl.LayerGroup(id="layer"),
+                                dl.LayerGroup(id="client-layer") 
                             ],
                             style={'width': '100%', 'height': '100%'},
                             id="map"
@@ -508,6 +575,7 @@ class EnergySimulationDashboard:
         @self.app.callback(
             [
                 Output("layer", "children"),
+                Output("client-layer", "children"),
                 Output("add-location-btn", "disabled"),
                 Output("run-simulation-btn", "disabled"),
                 Output("forecast-info", "children"),
@@ -558,12 +626,24 @@ class EnergySimulationDashboard:
             occupancy_slider_values,
             residents, size, length, width, wall_height,
             glazing_ratio, num_windows, num_doors, roof_type, roof_pitch,
-            include_appliances_value, max_Q_heating  # Capture max_Q_heating slider value
+            include_appliances_value, max_Q_heating
         ):
             # Initialize variables
             markers = [dl.Marker(position=(apt["lat"], apt["lon"]),
                                  children=[dl.Tooltip(f"{apt['name']}")])
                        for apt in self.apartments]
+                        # Add client locations to the map
+
+            client_markers = [
+                dl.Marker(
+                    position=(float(client["latitude"]), float(client["longitude"])),
+                    children=[dl.Tooltip(f"{client['Name']} ({client['IP']})")],
+                    # Alternatively, you can define a custom icon URL:
+                    icon={"iconUrl": "https://www.startntnu.no/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F3be0x32v%2Fproduction%2F845d4a14541c8070c7aec2281edd2324e91b169f-1024x1024.png&w=640&q=75", "iconSize": [50, 41], "iconAnchor": [12, 41]}
+                )
+                for client in self.client_locations
+            ]
+
             forecast_cards = []
             disable_add_location = True
             disable_run_simulation = True
@@ -571,6 +651,7 @@ class EnergySimulationDashboard:
                 html.I(className="fas fa-th-large mr-2"), "Toggle View"]
             error_message = ""
             ctx = callback_context
+
 
             # Helper function to identify the triggered input
             def is_triggered_by(prop):
@@ -788,6 +869,7 @@ class EnergySimulationDashboard:
 
                 return (
                     markers,
+                    client_markers,  # Pass the client markers here
                     disable_add_location,
                     disable_run_simulation,
                     forecast_cards,
