@@ -5,7 +5,8 @@ import logging
 from model.heatModule.buildingHeatLoss import BuildingHeatLoss
 from model.heatModule.heatingModule import HeatingSystem
 from model.PV.solar import SolarSetup, simulate_solar
-from fetchers import WeatherData, get_spot_prices
+from fetchers import WeatherData, get_spot_prices, get_price_area_from_location
+from batteryOptimizer.optimize_battery_schedule import optimize_battery_schedule
 # Import appliance models
 from model.appliance.appliance import (
     DishWasherStatistics,
@@ -115,7 +116,8 @@ def get_simulation_results(
     building_params: Dict,
     heating_params: Dict,
     occupant_profile: List[int],
-    include_appliances: bool = True
+    battery_params: Dict,
+    include_appliances: bool = True,
 ) -> Dict:
     """Run the heating and appliance simulation using the new models."""
     # Fetch weather data
@@ -194,7 +196,18 @@ def get_simulation_results(
         weather_data=weather_data,
         location=(lat, lon)
     )
-
+    price_area = get_price_area_from_location(lat, lon)
+    spot_price_timeseries = get_spot_prices(
+        area=price_area,
+        include_vat=True
+    )
+    soc_time_series, power_from_grid = optimize_battery_schedule(
+        battery_capacity_kWh=battery_params['capacity'],
+        battery_charge_rate_kW=battery_params['charge_rate'],
+        spot_price=spot_price_timeseries,
+        load_kWh=total_energy_consumption,
+        pv_production_kWh=PV_energy_production,
+        init_battery_soc=battery_params['initial_soc'])
     # Prepare the results
     results = {
         'temperatures_inside': temperatures_inside,
@@ -203,7 +216,10 @@ def get_simulation_results(
         'energy_consumption_appliances': appliance_energy_consumption,  # Now a dict
         'total_energy_consumption': total_energy_consumption,
         'Q_heating': Q_heating,
-        'Q_loss': Q_loss
+        'Q_loss': Q_loss,
+        'PV_energy_production': PV_energy_production,
+        'spot_price': spot_price_timeseries,
+        'state_of_charge': soc_time_series,
     }
 
     return results
