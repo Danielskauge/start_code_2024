@@ -1,6 +1,5 @@
 import math
 
-
 class BuildingHeatLoss:
     def __init__(
         self,
@@ -88,7 +87,7 @@ class BuildingHeatLoss:
         self.air_leakage_rate = air_leakage_rate
 
         # Initialize thermal bridge properties
-        self.thermal_bridge_psi_values = []  # Psi-values for each thermal bridge (W/(m·K))
+        self.thermal_bridge_psi_values = []  
         self.thermal_bridge_lengths = []
 
     def calculate_heat_transmission(self, delta_T):
@@ -224,9 +223,8 @@ class BuildingHeatLoss:
 
         Q_total = Q_transmission + Q_ventilation_heat_loss + Q_thermal_bridge
         return Q_total
-    
-    def calculate_thermal_mass(self):
 
+    def calculate_thermal_mass(self):
         # Thermal mass values for different materials
         thermal_mass_values = {
             # Wall materials (kJ/m²K for typical thicknesses)
