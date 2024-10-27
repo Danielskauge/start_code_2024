@@ -87,7 +87,7 @@ class BuildingHeatLoss:
         self.air_leakage_rate = air_leakage_rate
 
         # Initialize thermal bridge properties
-        self.thermal_bridge_psi_values = []  # Psi-values for each thermal bridge (W/(m·K))
+        self.thermal_bridge_psi_values = []  
         self.thermal_bridge_lengths = []
 
     def calculate_heat_transmission(self, delta_T):
