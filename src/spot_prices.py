@@ -5,66 +5,64 @@ import pytz
 
 def get_spot_prices(area: str = 'NO3', include_vat: bool = True) -> List[float]:
     """
-    Get spot prices for tomorrow from hvakosterstrommen.no API
+    Get spot prices from hvakosterstrommen.no API. 
+    Tries tomorrow first, falls back to today if tomorrow's prices aren't available.
     
     Parameters:
         area: Price area code (NO1-NO5, default: NO3 for Trondheim)
         include_vat: Whether to add VAT (25%, except NO4)
         
     Returns:
-        List of 24 hourly prices in NOK/kWh for tomorrow. 
-        Prices can be negative during periods of excess power.
+        List of 24 hourly prices in NOK/kWh
         
     Raises:
-        ValueError: If prices are not yet available or API call fails
+        ValueError: If neither today's nor tomorrow's prices are available
     """
-    tomorrow = datetime.now().date() + timedelta(days=1)
-    date_str = tomorrow.strftime('%Y/%m-%d')
-    
-    url = f"https://www.hvakosterstrommen.no/api/v1/prices/{date_str}_{area}.json"
-    
-    try:
+    def fetch_prices(date: datetime.date) -> List[float]:
+        date_str = date.strftime('%Y/%m-%d')
+        url = f"https://www.hvakosterstrommen.no/api/v1/prices/{date_str}_{area}.json"
+        
         response = requests.get(url, headers={
             'User-Agent': 'BuildingEnergySimulator/1.0 (danielrs@stud.ntnu.no)'
         })
         response.raise_for_status()
         
         data = response.json()
-        
-        # Extract prices and ensure we get exactly 24 hours
         prices = []
         hour_seen = set()
         
         for data_this_hour in data:
-            # Convert time to hour of day
             time = datetime.fromisoformat(data_this_hour['time_start'])
             hour_of_day = time.hour
             
-            # Skip if we've already seen this hour (handles DST changes)
             if hour_of_day in hour_seen:
                 continue
                 
             hour_seen.add(hour_of_day)
-            prices.append(data_this_hour['NOK_per_kWh'])  # Can be negative!
+            prices.append(data_this_hour['NOK_per_kWh'])
             
-            # Stop after 24 hours
             if len(prices) == 24:
                 break
         
         if len(prices) != 24:
-            raise ValueError(f"Could not get exactly 24 hours of prices (got {len(prices)})")
-        
-        # Add VAT if requested (except for NO4)
-        # Note: VAT is only applied to positive prices!
+            raise ValueError(f"Got {len(prices)} prices, expected 24")
+            
         if include_vat and area != 'NO4':
             prices = [price * 1.25 if price > 0 else price for price in prices]
             
         return prices
-        
-    except requests.RequestException as e:
-        raise ValueError(f"Error fetching spot prices: {e}")
-    except (KeyError, ValueError, TypeError) as e:
-        raise ValueError(f"Error parsing spot price data: {e}")
+
+    # Try tomorrow first
+    tomorrow = datetime.now().date() + timedelta(days=1)
+    try:
+        return fetch_prices(tomorrow)
+    except requests.RequestException:
+        # If tomorrow fails, try today
+        today = datetime.now().date()
+        try:
+            return fetch_prices(today)
+        except requests.RequestException as e:
+            raise ValueError(f"Could not fetch prices for either today or tomorrow: {e}")
 
 def get_price_area_from_location(lat: float, lon: float) -> str:
     """
