@@ -134,8 +134,20 @@ class EnergySimulationDashboard:
                                 min=20,
                                 max=200,
                                 step=5,
-                                className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
+                                className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded text-white",
                                 style={'color': 'white'}
+                            ),
+                            # New Slider for max_Q_heating
+                            html.Label("Max Heating Capacity (kW):", className="text-gray-300 text-sm mt-2"),
+                            dcc.Slider(
+                                id="input-max-Q-heating",
+                                min=1,
+                                max=10,
+                                step=0.5,
+                                value=5,
+                                marks={i: f"{i} kW" for i in range(1, 11)},
+                                tooltip={"placement": "bottom", "always_visible": True},
+                                className="mb-4"
                             ),
                         ])
                     ]),
@@ -150,7 +162,7 @@ class EnergySimulationDashboard:
                                 max=50,
                                 step=1,
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
-                                style={'color': 'white'}
+                                style={'backgroundColor': '#2d3748', 'color': 'white'}
                             ),
                             html.Label("Building Width (m):", className="text-gray-300 text-sm"),
                             dcc.Input(
@@ -161,7 +173,7 @@ class EnergySimulationDashboard:
                                 max=50,
                                 step=1,
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
-                                style={'color': 'white'}
+                                style={'backgroundColor': '#2d3748', 'color': 'white'}
                             ),
                             html.Label("Wall Height (m):", className="text-gray-300 text-sm"),
                             dcc.Input(
@@ -172,7 +184,7 @@ class EnergySimulationDashboard:
                                 max=5,
                                 step=0.1,
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
-                                style={'color': 'white'}
+                                style={'backgroundColor': '#2d3748', 'color': 'white'}
                             ),
                             html.Label("Glazing Ratio:", className="text-gray-300 text-sm"),
                             dcc.Slider(
@@ -194,7 +206,7 @@ class EnergySimulationDashboard:
                                 max=20,
                                 step=1,
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
-                                style={'color': 'white'}
+                                style={'backgroundColor': '#2d3748', 'color': 'white'}
                             ),
                             html.Label("Number of Doors:", className="text-gray-300 text-sm"),
                             dcc.Input(
@@ -205,7 +217,7 @@ class EnergySimulationDashboard:
                                 max=5,
                                 step=1,
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
-                                style={'color': 'white'}
+                                style={'backgroundColor': '#2d3748', 'color': 'white'}
                             ),
                             html.Label("Roof Type:", className="text-gray-300 text-sm"),
                             dcc.Dropdown(
@@ -218,7 +230,7 @@ class EnergySimulationDashboard:
                                 ],
                                 value='gable',
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
-                                style={'color': 'white'}
+                                style={'backgroundColor': '#2d3748', 'color': 'white'}
                             ),
                             html.Label("Roof Pitch (degrees):", className="text-gray-300 text-sm"),
                             dcc.Slider(
@@ -235,17 +247,32 @@ class EnergySimulationDashboard:
                     ]),
                     dcc.Tab(label='Occupancy', value='tab-occupant', className='custom-tab', selected_className='custom-tab--selected', children=[
                         html.Div([
-                            html.Label("Occupant Profile:", className="text-gray-300 text-sm mt-2"),
-                            dcc.Graph(
-                                id='occupant-profile-graph',
-                                config={'displayModeBar': False},
-                                style={'height': '300px'}
+                            html.Label("Occupant Profile:", className="text-gray-300 text-sm mt-2 mb-2"),
+                            html.Div(
+                                id='occupancy-sliders',
+                                children=[
+                                    html.Div([
+                                        html.Label(f"{hour}:00", className="text-gray-300 text-xs text-center"),
+                                        dcc.Slider(
+                                            id={'type': 'occupancy-slider', 'index': hour},
+                                            min=0,
+                                            max=4,
+                                            step=1,
+                                            value=2 if 6 <= hour < 8 or 18 <= hour < 22 else 0,
+                                            marks=None,
+                                            tooltip={"placement": "bottom", "always_visible": False},
+                                            className="mb-2"
+                                        )
+                                    ], className="w-1/4 px-1")
+                                    for hour in range(24)
+                                ],
+                                className="flex flex-wrap"
                             ),
                             html.Div(
                                 className="flex justify-between mt-2 text-xs text-gray-400",
                                 children=[
-                                    html.Span("Click and drag the bars to adjust the number of occupants per hour."),
-                                    html.Span("Max occupants: 10")
+                                    html.Span("Adjust the number of occupants per hour."),
+                                    html.Span("Max occupants: 4")
                                 ]
                             ),
                             html.Label("Include Appliances:", className="text-gray-300 text-sm mt-4"),
@@ -253,7 +280,8 @@ class EnergySimulationDashboard:
                                 id="include-appliances",
                                 options=[{'label': 'Yes', 'value': 'yes'}],
                                 value=['yes'],
-                                className="mb-4"
+                                className="mb-4",
+                                style={'color': 'white'}
                             ),
                         ])
                     ]),
@@ -449,7 +477,7 @@ class EnergySimulationDashboard:
                 Output("input-num-doors", "value"),
                 Output("input-roof-type", "value"),
                 Output("input-roof-pitch", "value"),
-                Output("occupant-profile-graph", "figure"),
+                Output({'type': 'occupancy-slider', 'index': ALL}, 'value'),
                 Output("include-appliances", "value"),
                 Output("map", "clickData"),
                 Output("error-message", "children"),
@@ -461,9 +489,9 @@ class EnergySimulationDashboard:
                 Input("run-simulation-btn", "n_clicks"),
                 Input("toggle-view-btn", "n_clicks"),
                 Input({"type": "gallery-card", "index": ALL}, "n_clicks"),
-                Input("occupant-profile-graph", "clickData"),
-                Input("occupant-profile-graph", "selectedData"),
-                # Add Inputs for all input fields
+                # Inputs for occupancy sliders
+                Input({'type': 'occupancy-slider', 'index': ALL}, 'value'),
+                # Inputs for all other settings
                 Input("input-residents", "value"),
                 Input("input-size", "value"),
                 Input("input-length", "value"),
@@ -475,20 +503,20 @@ class EnergySimulationDashboard:
                 Input("input-roof-type", "value"),
                 Input("input-roof-pitch", "value"),
                 Input("include-appliances", "value"),
-            ],
-            State("occupant-profile-graph", "figure")
+                Input("input-max-Q-heating", "value")  # New input for max_Q_heating
+            ]
         )
         def handle_callbacks(
-            click_data, add_n_clicks, run_n_clicks, toggle_n_clicks, gallery_clicks, clickData, selectedData,
+            click_data, add_n_clicks, run_n_clicks, toggle_n_clicks, gallery_clicks,
+            occupancy_slider_values,
             residents, size, length, width, wall_height,
             glazing_ratio, num_windows, num_doors, roof_type, roof_pitch,
-            include_appliances_value,
-            occupant_profile_figure_state
+            include_appliances_value, max_Q_heating  # Capture max_Q_heating slider value
         ):
             # Initialize variables
             markers = [dl.Marker(position=(apt["lat"], apt["lon"]),
-                                 children=[dl.Tooltip(f"{apt['name']}")])
-                       for apt in self.apartments]
+                                children=[dl.Tooltip(f"{apt['name']}")])
+                    for apt in self.apartments]
             forecast_cards = []
             disable_add_location = True
             disable_run_simulation = True
@@ -501,10 +529,7 @@ class EnergySimulationDashboard:
                 return any(prop in triggered_id for triggered_id in ctx.triggered_prop_ids)
 
             # Occupant profile management
-            if occupant_profile_figure_state:
-                occupant_profile = occupant_profile_figure_state['data'][0]['y']
-            else:
-                occupant_profile = [2 if 6 <= i < 8 or 18 <= i < 22 else 0 for i in range(24)]
+            occupant_profile = occupancy_slider_values
 
             include_appliances = 'yes' in include_appliances_value if include_appliances_value else False
 
@@ -530,7 +555,7 @@ class EnergySimulationDashboard:
                         num_doors,
                         roof_type,
                         roof_pitch,
-                        occupant_profile_figure_state,
+                        occupant_profile,
                         include_appliances_value,
                         None,
                         error_message,
@@ -565,7 +590,7 @@ class EnergySimulationDashboard:
                     heating_params = {
                         'COP': 3.5,
                         'min_Q_heating': 0,
-                        'max_Q_heating': 5,
+                        'max_Q_heating': max_Q_heating,  # Use max_Q_heating from slider
                         'temperature_setpoint': 20,
                         'initial_temperature_inside': 18
                     }
@@ -592,12 +617,13 @@ class EnergySimulationDashboard:
                         self.selected_location = None
                         markers = [
                             dl.Marker(position=(apt["lat"], apt["lon"]),
-                                      children=[dl.Tooltip(f"{apt['name']}")])
+                                    children=[dl.Tooltip(f"{apt['name']}")])
                             for apt in self.apartments
                         ]
                         disable_add_location = True
                         disable_run_simulation = False
                         forecast_cards = [self.create_forecast_card(apartment, expanded=True)]
+                        self.expanded_view = True  # Show expanded view
                     else:
                         error_message = simulation_results['error']
 
@@ -620,8 +646,9 @@ class EnergySimulationDashboard:
                         self.current_apartment['occupant_profile'] = occupant_profile
                         self.current_apartment['include_appliances'] = include_appliances
 
-                        # Re-run simulation
+                        # Re-run simulation with new max_Q_heating value
                         heating_params = self.current_apartment.get('heating_params', {})
+                        heating_params['max_Q_heating'] = max_Q_heating  # Update max_Q_heating
                         simulation_results = get_heating_simulation(
                             self.current_apartment['lat'], self.current_apartment['lon'],
                             building_params, heating_params,
@@ -630,16 +657,15 @@ class EnergySimulationDashboard:
                         )
                         self.current_apartment['simulation'] = simulation_results
                         forecast_cards = [self.create_forecast_card(self.current_apartment, expanded=True)]
+                        self.expanded_view = True  # Show expanded view
                     else:
                         error_message = "No apartment selected."
 
                 elif is_triggered_by("gallery-card"):
                     # Gallery card click handling
-                    # Find which gallery card was clicked
                     for i, n_clicks in enumerate(gallery_clicks):
                         if n_clicks and n_clicks > 0:
                             self.current_apartment = self.apartments[i]
-                            # Reset the n_clicks to prevent multiple triggers
                             gallery_clicks[i] = 0
                             break
                     if self.current_apartment:
@@ -659,6 +685,7 @@ class EnergySimulationDashboard:
                         include_appliances_value = ['yes'] if include_appliances else []
                         disable_run_simulation = False
                         forecast_cards = [self.create_forecast_card(self.current_apartment, expanded=True)]
+                        self.expanded_view = True  # Switch to expanded view
                     else:
                         # Defaults if apartment not found
                         residents = dash.no_update
@@ -679,39 +706,9 @@ class EnergySimulationDashboard:
                     self.expanded_view = not self.expanded_view
                     self.current_apartment = None if not self.expanded_view else self.current_apartment
 
-                elif is_triggered_by("occupant-profile-graph"):
-                    if clickData:
-                        hour = int(clickData['points'][0]['x'])
-                        occupant_profile[hour] = min(occupant_profile[hour] + 1, 10)
-                    elif selectedData:
-                        for point in selectedData['points']:
-                            hour = int(point['x'])
-                            occupant_profile[hour] = min(occupant_profile[hour] + 1, 10)
-
                 else:
                     # Enable the "Run Simulation" button if there's a current apartment
                     disable_run_simulation = False if self.current_apartment else True
-
-                # Update occupant profile graph
-                occupant_profile_fig = {
-                    'data': [
-                        {
-                            'x': list(range(24)),
-                            'y': occupant_profile,
-                            'type': 'bar',
-                            'marker': {'color': '#48bb78'}
-                        }
-                    ],
-                    'layout': {
-                        'margin': {'l': 40, 'r': 20, 't': 20, 'b': 30},
-                        'paper_bgcolor': 'rgba(0,0,0,0)',
-                        'plot_bgcolor': 'rgba(0,0,0,0)',
-                        'font': {'color': 'white'},
-                        'xaxis': {'title': 'Hour'},
-                        'yaxis': {'title': 'Occupants', 'range': [0, 10]},
-                        'clickmode': 'event+select',
-                    }
-                }
 
                 # Update gallery and forecast cards
                 if self.expanded_view and self.current_apartment:
@@ -747,7 +744,7 @@ class EnergySimulationDashboard:
                     num_doors,
                     roof_type,
                     roof_pitch,
-                    occupant_profile_fig,
+                    occupant_profile,
                     include_appliances_value,
                     None,  # Reset map clickData
                     error_message,
@@ -757,26 +754,8 @@ class EnergySimulationDashboard:
             except Exception as e:
                 logger.exception("An error occurred during callback execution.")
                 # Return defaults in case of error
-                occupant_profile_fig = {
-                    'data': [
-                        {
-                            'x': list(range(24)),
-                            'y': [2 if 6 <= i < 8 or 18 <= i < 22 else 0 for i in range(24)],
-                            'type': 'bar',
-                            'marker': {'color': '#48bb78'}
-                        }
-                    ],
-                    'layout': {
-                        'margin': {'l': 40, 'r': 20, 't': 20, 'b': 30},
-                        'paper_bgcolor': 'rgba(0,0,0,0)',
-                        'plot_bgcolor': 'rgba(0,0,0,0)',
-                        'font': {'color': 'white'},
-                        'xaxis': {'title': 'Hour'},
-                        'yaxis': {'title': 'Occupants', 'range': [0, 10]},
-                        'clickmode': 'event+select',
-                    }
-                }
-                return markers, True, True, forecast_cards, [], toggle_button_text, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, occupant_profile_fig, dash.no_update, None, "An error occurred.", "gap-6"
+                return markers, True, True, forecast_cards, [], toggle_button_text, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, [2 if 6 <= i < 8 or 18 <= i < 22 else 0 for i in range(24)], dash.no_update, None, "An error occurred.", "gap-6"
+
 
     def run(self):
         """Run the dashboard server."""
