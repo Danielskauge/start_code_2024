@@ -4,7 +4,8 @@ import dash_leaflet as dl
 import plotly.graph_objs as go
 import logging
 from dash.dependencies import Input, Output, State, ALL
-from simulation import get_heating_simulation, get_location_name
+from simulation import get_simulation_results
+from fetchers import get_location_name
 import numpy as np
 import requests  # Import to handle API requests
 
@@ -26,11 +27,10 @@ class EnergySimulationDashboard:
         self.current_apartment = None  # New property to track current apartment
         self.client_locations = []  # Store fetched client data
 
-
         # Initialize layout and callbacks
         self.setup_layout()
         self.setup_callbacks()
-        self.fetch_client_data() 
+        self.fetch_client_data()
 
     def setup_layout(self):
         """Setup the dashboard layout."""
@@ -65,21 +65,21 @@ class EnergySimulationDashboard:
         return html.Div(
             className="lg:w-1/4 bg-gray-800 shadow-lg border-r border-gray-700 flex flex-col",
             children=[
-                    html.Div(
-                        className="p-4 border-b border-gray-700",
-                        children=[
-                            html.H2(
-                                "Energy Simulation", className="text-2xl font-bold text-green-300 mb-2"),
-                            html.P("Configure your settings and visualize energy consumption.",
-                                className="text-gray-400 text-sm"),
-                            html.A(
-                                [html.I(className="fas fa-external-link-alt mr-2"),
-                                "Go to Dashboard"],
-                                href="https://dashboard.vps2.martindata.no/",
-                                target="_blank",
-                                className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center"
-                            ),
-                        ]
+                html.Div(
+                    className="p-4 border-b border-gray-700",
+                    children=[
+                        html.H2(
+                            "Energy Simulation", className="text-2xl font-bold text-green-300 mb-2"),
+                        html.P("Configure your settings and visualize energy consumption.",
+                               className="text-gray-400 text-sm"),
+                        html.A(
+                            [html.I(className="fas fa-external-link-alt mr-2"),
+                             "Go to Dashboard"],
+                            href="https://dashboard.vps2.martindata.no/",
+                            target="_blank",
+                            className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center"
+                        ),
+                    ]
                 ),
                 html.Div(
                     className="flex-1 overflow-y-auto",
@@ -90,11 +90,12 @@ class EnergySimulationDashboard:
                 )
             ]
         )
-    
+
     def fetch_client_data(self):
         """Fetch client data from the external API and create cards."""
         try:
-            response = requests.get("https://dashboard.vps2.martindata.no/get_clients")
+            response = requests.get(
+                "https://dashboard.vps2.martindata.no/get_clients")
             if response.status_code == 200:
                 self.client_locations = response.json()
                 for client in self.client_locations:
@@ -102,7 +103,7 @@ class EnergySimulationDashboard:
                     lat = float(client["latitude"])
                     lon = float(client["longitude"])
                     location_name = client["Name"]
-                    
+
                     # Set up default parameters for the simulation
                     building_params = {
                         'length': 10,
@@ -122,12 +123,13 @@ class EnergySimulationDashboard:
                         'initial_temperature_inside': 18
                     }
                     # Placeholder simulation result (can be updated upon user request)
-                    simulation_results = get_heating_simulation(
+                    simulation_results = get_simulation_results(
                         lat, lon, building_params, heating_params,
-                        occupant_profile=[2 if 6 <= i < 8 or 18 <= i < 22 else 0 for i in range(24)],
+                        occupant_profile=[2 if 6 <= i < 8 or 18 <=
+                                          i < 22 else 0 for i in range(24)],
                         include_appliances=True
                     )
-                    
+
                     # Create a new apartment entry for the fetched client
                     apartment = {
                         "id": len(self.apartments),  # Unique ID
@@ -139,10 +141,11 @@ class EnergySimulationDashboard:
                         "include_appliances": True,
                         "simulation": simulation_results
                     }
-                    
+
                     self.apartments.append(apartment)
             else:
-                logger.error(f"Failed to fetch client data: {response.status_code}")
+                logger.error(
+                    f"Failed to fetch client data: {response.status_code}")
         except Exception as e:
             logger.exception("Error fetching client data.")
 
@@ -163,7 +166,7 @@ class EnergySimulationDashboard:
                                 dl.TileLayer(
                                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"),
                                 dl.LayerGroup(id="layer"),
-                                dl.LayerGroup(id="client-layer") 
+                                dl.LayerGroup(id="client-layer")
                             ],
                             style={'width': '100%', 'height': '100%'},
                             id="map"
@@ -308,6 +311,58 @@ class EnergySimulationDashboard:
                                 min=0,
                                 max=5,
                                 step=1,
+                                className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
+                                style={'backgroundColor': '#2d3748',
+                                       'color': 'white'}
+                            ),
+                            html.Label("Solar Panel Peak Power (kW):",
+                                       className="text-gray-300 text-sm"),
+                            dcc.Input(
+                                id="input-solar-panel-peak-power",
+                                type="number",
+                                value=1,
+                                min=0,
+                                max=5,
+                                step=0.5,
+                                className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
+                                style={'backgroundColor': '#2d3748',
+                                       'color': 'white'}
+                            ),
+                            html.Label("Solar Panel Azimuth (degrees):",
+                                       className="text-gray-300 text-sm"),
+                            dcc.Input(
+                                id="input-solar-panel-azimuth",
+                                type="number",
+                                value=180,
+                                min=0,
+                                max=360,
+                                step=1,
+                                className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
+                                style={'backgroundColor': '#2d3748',
+                                       'color': 'white'}
+                            ),
+                            html.Label("Solar Panel Efficiency:",
+                                       className="text-gray-300 text-sm"),
+                            dcc.Input(
+                                id="input-solar-panel-efficiency",
+                                type="number",
+                                value=0.2,
+                                min=0,
+                                max=1,
+                                step=0.01,
+                                className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
+                                style={'backgroundColor': '#2d3748',
+                                       'color': 'white'}
+                            ),
+                            html.Label("Solar Panel Temp. Coefficient (%/°C):",
+                                       className="text-gray-300 text-sm"),
+                            dcc.Input(
+                                id="input-solar-panel-temp-coefficient",
+                                type="number",
+                                value=-0.3,
+                                min=-1,
+                                max=0,
+                                step=0.01,
                                 className="w-full p-2 mb-4 bg-gray-800 border border-gray-600 rounded",
                                 style={'backgroundColor': '#2d3748',
                                        'color': 'white'}
@@ -518,6 +573,14 @@ class EnergySimulationDashboard:
                                 f"Roof Type: {building_params['roof_type'].capitalize()}"),
                             html.P(
                                 f"Roof Pitch: {building_params['roof_pitch']}°"),
+                            html.P(
+                                f"Solar Panel Azimuth: {building_params['solar_panel_azimuth']}°"),
+                            html.P(
+                                f"Solar Panel Peak Power: {building_params['solar_panel_peak_power']}°"),
+                            html.P(
+                                f"Solar Panel Efficiency: {building_params['solar_panel_efficiency']}"),
+                            html.P(
+                                f"Solar Panel Temp. Coefficient: {building_params['solar_panel_temp_coefficient']}"),
                         ]),
                     ]
                 ),
@@ -591,6 +654,10 @@ class EnergySimulationDashboard:
                 Output("input-num-doors", "value"),
                 Output("input-roof-type", "value"),
                 Output("input-roof-pitch", "value"),
+                Output("input-solar-panel-peak-power", "value"),
+                Output("input-solar-panel-azimuth", "value"),
+                Output("input-solar-panel-efficiency", "value"),
+                Output("input-solar-panel-temp-coefficient", "value"),
                 Output({'type': 'occupancy-slider', 'index': ALL}, 'value'),
                 Output("include-appliances", "value"),
                 Output("map", "clickData"),
@@ -617,6 +684,10 @@ class EnergySimulationDashboard:
                 Input("input-roof-type", "value"),
                 Input("input-roof-pitch", "value"),
                 Input("include-appliances", "value"),
+                Input("input-solar-panel-peak-power", "value"),
+                Input("input-solar-panel-azimuth", "value"),
+                Input("input-solar-panel-efficiency", "value"),
+                Input("input-solar-panel-temp-coefficient", "value"),
                 # New input for max_Q_heating
                 Input("input-max-Q-heating", "value")
             ]
@@ -626,20 +697,25 @@ class EnergySimulationDashboard:
             occupancy_slider_values,
             residents, size, length, width, wall_height,
             glazing_ratio, num_windows, num_doors, roof_type, roof_pitch,
-            include_appliances_value, max_Q_heating
+            include_appliances_value, max_Q_heating,  # Capture max_Q_heating slider value
+            solar_panel_peak_power, solar_panel_azimuth,
+            solar_panel_efficiency, solar_panel_temp_coefficient
         ):
             # Initialize variables
             markers = [dl.Marker(position=(apt["lat"], apt["lon"]),
                                  children=[dl.Tooltip(f"{apt['name']}")])
                        for apt in self.apartments]
-                        # Add client locations to the map
+            # Add client locations to the map
 
             client_markers = [
                 dl.Marker(
-                    position=(float(client["latitude"]), float(client["longitude"])),
-                    children=[dl.Tooltip(f"{client['Name']} ({client['IP']})")],
+                    position=(float(client["latitude"]),
+                              float(client["longitude"])),
+                    children=[dl.Tooltip(
+                        f"{client['Name']} ({client['IP']})")],
                     # Alternatively, you can define a custom icon URL:
-                    icon={"iconUrl": "https://www.startntnu.no/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F3be0x32v%2Fproduction%2F845d4a14541c8070c7aec2281edd2324e91b169f-1024x1024.png&w=640&q=75", "iconSize": [50, 41], "iconAnchor": [12, 41]}
+                    icon={"iconUrl": "https://www.startntnu.no/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F3be0x32v%2Fproduction%2F845d4a14541c8070c7aec2281edd2324e91b169f-1024x1024.png&w=640&q=75",
+                          "iconSize": [50, 41], "iconAnchor": [12, 41]}
                 )
                 for client in self.client_locations
             ]
@@ -652,8 +728,8 @@ class EnergySimulationDashboard:
             error_message = ""
             ctx = callback_context
 
-
             # Helper function to identify the triggered input
+
             def is_triggered_by(prop):
                 return any(prop in triggered_id for triggered_id in ctx.triggered_prop_ids)
 
@@ -684,6 +760,10 @@ class EnergySimulationDashboard:
                         num_doors,
                         roof_type,
                         roof_pitch,
+                        solar_panel_azimuth,
+                        solar_panel_peak_power,
+                        solar_panel_temp_coefficient,
+                        solar_panel_efficiency,
                         occupant_profile,
                         include_appliances_value,
                         None,
@@ -716,6 +796,10 @@ class EnergySimulationDashboard:
                         'num_doors': num_doors,
                         'roof_type': roof_type,
                         'roof_pitch': roof_pitch,
+                        'solar_panel_peak_power': solar_panel_peak_power,
+                        'solar_panel_azimuth': solar_panel_azimuth,
+                        'solar_panel_efficiency': solar_panel_efficiency,
+                        'solar_panel_temp_coefficient': solar_panel_temp_coefficient
                     }
                     heating_params = {
                         'COP': 3.5,
@@ -725,7 +809,7 @@ class EnergySimulationDashboard:
                         'initial_temperature_inside': 18
                     }
 
-                    simulation_results = get_heating_simulation(
+                    simulation_results = get_simulation_results(
                         lat, lon, building_params, heating_params,
                         occupant_profile=occupant_profile,
                         include_appliances=include_appliances
@@ -770,6 +854,10 @@ class EnergySimulationDashboard:
                             'num_doors': num_doors,
                             'roof_type': roof_type,
                             'roof_pitch': roof_pitch,
+                            'solar_panel_peak_power': solar_panel_peak_power,
+                            'solar_panel_azimuth': solar_panel_azimuth,
+                            'solar_panel_efficiency': solar_panel_efficiency,
+                            'solar_panel_temp_coefficient': solar_panel_temp_coefficient
                         }
                         self.current_apartment['building_params'] = building_params
                         self.current_apartment['residents'] = residents
@@ -782,7 +870,7 @@ class EnergySimulationDashboard:
                             'heating_params', {})
                         # Update max_Q_heating
                         heating_params['max_Q_heating'] = max_Q_heating
-                        simulation_results = get_heating_simulation(
+                        simulation_results = get_simulation_results(
                             self.current_apartment['lat'], self.current_apartment['lon'],
                             building_params, heating_params,
                             occupant_profile=occupant_profile,
@@ -814,6 +902,10 @@ class EnergySimulationDashboard:
                         num_doors = building_params['num_doors']
                         roof_type = building_params['roof_type']
                         roof_pitch = building_params['roof_pitch']
+                        solar_panel_peak_power = building_params['solar_panel_peak_power']
+                        solar_panel_azimuth = building_params['solar_panel_azimuth']
+                        solar_panel_efficiency = building_params['solar_panel_efficiency']
+                        solar_panel_temp_coefficient = building_params['solar_panel_temp_coefficient']
                         occupant_profile = self.current_apartment.get(
                             'occupant_profile', [0]*24)
                         include_appliances = self.current_apartment.get(
@@ -836,6 +928,10 @@ class EnergySimulationDashboard:
                         num_doors = dash.no_update
                         roof_type = dash.no_update
                         roof_pitch = dash.no_update
+                        solar_panel_azimuth = dash.no_update
+                        solar_panel_peak_power = dash.no_update
+                        solar_panel_efficiency = dash.no_update
+                        solar_panel_temp_coefficient = dash.no_update
                         occupant_profile = [0]*24
                         include_appliances_value = dash.no_update
                         disable_run_simulation = True
@@ -885,6 +981,10 @@ class EnergySimulationDashboard:
                     num_doors,
                     roof_type,
                     roof_pitch,
+                    solar_panel_azimuth,
+                    solar_panel_peak_power,
+                    solar_panel_efficiency,
+                    solar_panel_temp_coefficient,
                     occupant_profile,
                     include_appliances_value,
                     None,  # Reset map clickData

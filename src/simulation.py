@@ -1,10 +1,11 @@
 import requests
 from functools import lru_cache
-import logging
 from typing import Dict, Optional, List, Tuple
+import logging
 from model.heatModule.buildingHeatLoss import BuildingHeatLoss
 from model.heatModule.heatingModule import HeatingSystem
 from model.PV.solar import SolarSetup, simulate_solar
+from fetchers import WeatherData, get_spot_prices
 # Import appliance models
 from model.appliance.appliance import (
     DishWasherStatistics,
@@ -23,6 +24,7 @@ MET_API_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
 HEADERS = {
     "User-Agent": "EnergyDashboard/1.0 (your_email@example.com)"
 }
+WEATHER_DATA_FETCHER = WeatherData()
 
 
 class WeatherDataError(Exception):
@@ -41,23 +43,6 @@ def get_weather_data(lat: float, lon: float) -> Optional[Dict]:
     except requests.RequestException as e:
         logger.error(f"Weather data request failed: {e}")
         return None
-
-
-@lru_cache(maxsize=100)
-def get_location_name(lat: float, lon: float) -> str:
-    """Fetches location name via Nominatim."""
-    url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-    try:
-        response = requests.get(
-            url,
-            headers={"User-Agent": HEADERS["User-Agent"]},
-            timeout=5
-        )
-        response.raise_for_status()
-        return response.json().get("display_name", "Unknown Location")
-    except requests.RequestException as e:
-        logger.error(f"Geocoding failed: {e}")
-        return "Unknown Location"
 
 
 def get_appliance_consumption(occupant_profile: List[int]) -> Dict[str, List[float]]:
@@ -124,7 +109,7 @@ def get_PV_simulation(
     return generation
 
 
-def get_heating_simulation(
+def get_simulation_results(
     lat: float,
     lon: float,
     building_params: Dict,
@@ -134,15 +119,12 @@ def get_heating_simulation(
 ) -> Dict:
     """Run the heating and appliance simulation using the new models."""
     # Fetch weather data
-    weather_data = get_weather_data(lat, lon)
+    weather_data = WEATHER_DATA_FETCHER.get_forecast((lat, lon))
     if weather_data is None:
         return {"error": "Weather data unavailable."}
 
     # Extract outside temperatures for the next 24 hours
-    temperatures_outside = [
-        entry['data']['instant']['details'].get('air_temperature', 15)
-        for entry in weather_data['properties']['timeseries'][:24]
-    ]
+    temperatures_outside = weather_data["temperature"]
 
     # Initialize the BuildingHeatLoss instance with provided parameters
     building = BuildingHeatLoss(**building_params)
@@ -195,6 +177,15 @@ def get_heating_simulation(
         heating + appliance_total
         for heating, appliance_total in zip(energy_consumption_heating, total_appliance_consumption)
     ]
+    PV_energy_production = get_PV_simulation(
+        peak_power_kw=building_params['solar_panel_peak_power'],
+        azimuth_angle=building_params['solar_panel_azimuth'],
+        efficiency=building_params['solar_panel_efficiency'],
+        temp_coefficient=building_params['solar_panel_temp_coefficient'],
+        tilt_angle=building_params['roof_pitch'],
+        weather_data=weather_data,
+        location=(lat, lon)
+    )
 
     # Prepare the results
     results = {
