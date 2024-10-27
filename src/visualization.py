@@ -63,7 +63,7 @@ class EnergySimulationDashboard:
     def create_sidebar(self):
         """Create sidebar with map and settings."""
         return html.Div(
-            className="lg:w-1/4 bg-gray-800 shadow-lg border-r border-gray-700 flex flex-col",
+className="lg:w-1/3 bg-gray-800 shadow-lg border-r border-gray-700 flex flex-col",
             children=[
                     html.Div(
                         className="p-4 border-b border-gray-700",
@@ -77,7 +77,7 @@ class EnergySimulationDashboard:
                                  "Go to Dashboard"],
                                 href="https://dashboard.vps2.martindata.no/",
                                 target="_blank",
-                                className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center"
+                                className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center"
                             ),
                         ]
                 ),
@@ -199,7 +199,8 @@ class EnergySimulationDashboard:
                 html.H3(
                     "Settings", className="text-lg font-semibold text-green-200 mb-2"),
                 dcc.Tabs(id='settings-tabs', value='tab-apartment', children=[
-                    dcc.Tab(label='Apartment', value='tab-apartment', className='custom-tab', selected_className='custom-tab--selected', children=[
+                    dcc.Tab(label='Apartment', value='tab-apartment', className='custom-tab', selected_className='custom-tab--selected',    style={'backgroundColor': '#2d3748', 'color': 'white'},
+    selected_style={'backgroundColor': '#1a202c', 'color': 'white'}, children=[
                         html.Div([
                             html.Label("Number of Residents:",
                                        className="text-gray-300 text-sm mt-2"),
@@ -242,7 +243,8 @@ class EnergySimulationDashboard:
                             ),
                         ])
                     ]),
-                    dcc.Tab(label='Building', value='tab-building', className='custom-tab', selected_className='custom-tab--selected', children=[
+                    dcc.Tab(label='Building', value='tab-building', className='custom-tab', selected_className='custom-tab--selected',     style={'backgroundColor': '#2d3748', 'color': 'white'},
+    selected_style={'backgroundColor': '#1a202c', 'color': 'white'},children=[
                         html.Div([
                             html.Label("Building Length (m):",
                                        className="text-gray-300 text-sm mt-2"),
@@ -353,7 +355,8 @@ class EnergySimulationDashboard:
                             ),
                         ])
                     ]),
-                    dcc.Tab(label='Solar', value='tab-solar', className='custom-tab', selected_className='custom-tab--selected', children=[
+                    dcc.Tab(label='Solar', value='tab-solar', className='custom-tab', selected_className='custom-tab--selected',    style={'backgroundColor': '#2d3748', 'color': 'white'},
+    selected_style={'backgroundColor': '#1a202c', 'color': 'white'}, children=[
                         html.Div([
                             html.Label("Solar Panel Peak Power (kW):",
                                        className="text-gray-300 text-sm mt-2"),
@@ -409,7 +412,8 @@ class EnergySimulationDashboard:
                             ),
                         ])
                     ]),
-                    dcc.Tab(label='Battery', value='tab-battery', className='custom-tab', selected_className='custom-tab--selected', children=[
+                    dcc.Tab(label='Battery', value='tab-battery', className='custom-tab', selected_className='custom-tab--selected',    style={'backgroundColor': '#2d3748', 'color': 'white'},
+    selected_style={'backgroundColor': '#1a202c', 'color': 'white'}, children=[
                         html.Div([
                             html.Label("Battery Capacity (kWh):",
                                        className="text-gray-300 text-sm mt-2"),
@@ -452,7 +456,8 @@ class EnergySimulationDashboard:
                             ),
                         ])
                     ]),
-                    dcc.Tab(label='Occupancy', value='tab-occupant', className='custom-tab', selected_className='custom-tab--selected', children=[
+                    dcc.Tab(label='Occupancy', value='tab-occupant', className='custom-tab', selected_className='custom-tab--selected',    style={'backgroundColor': '#2d3748', 'color': 'white'},
+    selected_style={'backgroundColor': '#1a202c', 'color': 'white'}, children=[
                         html.Div([
                             html.Label(
                                 "Occupant Profile:", className="text-gray-300 text-sm mt-2 mb-2"),
@@ -502,7 +507,7 @@ class EnergySimulationDashboard:
                 html.Button(
                     [html.I(className="fas fa-play mr-2"), "Run Simulation"],
                     id="run-simulation-btn",
-                    className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center",
+                    className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded mt-4 flex items-center justify-center",
                     disabled=True
                 ),
                 html.Div(id="error-message",
@@ -524,7 +529,7 @@ class EnergySimulationDashboard:
                             [html.I(className="fas fa-th-large mr-2"),
                              "Toggle View"],
                             id="toggle-view-btn",
-                            className="bg-blue-500 text-white font-bold py-2 px-4 rounded flex items-center"
+                            className="bg-green-500 text-white font-bold py-2 px-4 rounded flex items-center"
                         ),
                     ]
                 ),
