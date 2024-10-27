@@ -1,0 +1,3 @@
+[submodule "src/batteryOptimizer"]
+	path = src/batteryOptimizer
+	url = git@github.com:enmo-solutions/code24-case2.git
