@@ -127,7 +127,15 @@ def get_simulation_results(
     temperatures_outside = weather_data["temperature"]
 
     # Initialize the BuildingHeatLoss instance with provided parameters
-    building = BuildingHeatLoss(**building_params)
+    building = BuildingHeatLoss(
+        length=building_params['length'],
+        width=building_params['width'],
+        wall_height=building_params['wall_height'],
+        glazing_ratio=building_params['glazing_ratio'],
+        num_windows=building_params['num_windows'],
+        num_doors=building_params['num_doors'],
+        roof_type=building_params['roof_type'],
+        roof_pitch=building_params['roof_pitch'])
 
     # Initialize the HeatingSystem instance
     heating_system = HeatingSystem(
