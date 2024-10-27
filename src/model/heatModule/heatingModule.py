@@ -1,8 +1,9 @@
 from typing import List
-from heatModule.buildingHeatLoss import BuildingHeatLoss
+from .buildingHeatLoss import BuildingHeatLoss
+
 
 class HeatingSystem:
-    def __init__(self, building: BuildingHeatLoss, COP: float, min_Q_heating: float, max_Q_heating: float, controller:str = "PID"):
+    def __init__(self, building: BuildingHeatLoss, COP: float, min_Q_heating: float, max_Q_heating: float, controller: str = "PID"):
         self.building = building
         self.COP = COP
         self.min_Q_heating = min_Q_heating
@@ -14,9 +15,9 @@ class HeatingSystem:
         self.integral = 0
         self.previous_error = 0
 
-        self.Kp = 10.0  
-        self.Ki = 0.05  
-        self.Kd = 5.0   
+        self.Kp = 10.0
+        self.Ki = 0.05
+        self.Kd = 5.0
 
     def heat_control(self, temperature_setpoint: float, temperature_inside: float):
         if self.controller == "PID":
@@ -25,8 +26,9 @@ class HeatingSystem:
 
             derivative = (error - self.previous_error) / self.dt
             output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-            Q_heating = max(min(output, self.max_Q_heating), self.min_Q_heating)
-            
+            Q_heating = max(min(output, self.max_Q_heating),
+                            self.min_Q_heating)
+
             self.previous_error = error
         elif self.controller == "on_off":
             if temperature_inside < temperature_setpoint:
@@ -52,8 +54,10 @@ class HeatingSystem:
 
     def simulate_heating(self, temperatures_outside: List[float], temperature_setpoints: List[float], initial_temperature_inside: float, internal_heat_gains: List[float] = None):
         # Ensure we have 24 hours of data
-        assert len(temperatures_outside) == 24, "Must provide 24 hours of outside temperatures"
-        assert len(temperature_setpoints) == 24, "Must provide 24 hours of temperature setpoints"
+        assert len(
+            temperatures_outside) == 24, "Must provide 24 hours of outside temperatures"
+        assert len(
+            temperature_setpoints) == 24, "Must provide 24 hours of temperature setpoints"
 
         # Ensure internal_heat_gains is provided
         if internal_heat_gains is None:
@@ -71,7 +75,7 @@ class HeatingSystem:
                 temperatures_outside[hour],
                 internal_heat_gain=internal_heat_gains[hour]
             )
-            
+
             temperatures_inside.append(new_temperature)
             energy_consumption_per_hour.append(E_electrical)
             Q_heating_per_hour.append(Q_heating)
