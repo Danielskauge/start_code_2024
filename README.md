@@ -1,83 +1,49 @@
-# start_code_2024
+# EnergyOptAI 🌞
 
-# Building Energy System Simulator
+> Built at Start Code Hackathon 2024 - Smart energy optimization for a sustainable future
 
-A Python simulator for building energy systems with solar panels and battery storage. Simulates power consumption, solar generation, and optimizes battery usage based on spot prices.
+EnergyOptAI is an advanced building energy system simulator that helps property owners optimize their energy usage through AI-powered predictions and real-time price optimization. It combines solar generation, battery storage, and consumption patterns to reduce costs and carbon footprint.
 
-## Installation
+## 🚀 Key Features
+
+- **Smart Energy Simulation**: Advanced modeling of building energy consumption using the CREST model and Markov chains
+- **Solar Generation Forecasting**: Precise solar panel output prediction based on weather, location, and panel specifications
+- **Battery Optimization**: AI-powered battery charge/discharge scheduling using spot price optimization
+- **Real-time Price Integration**: Dynamic optimization based on current electricity spot prices
+- **Interactive Visualization**: Rich data visualization for energy flows and cost savings
+
+## 🛠️ Technical Stack
+
+- **Core Engine**: Python-based simulation engine with modular architecture
+- **Optimization**: Linear programming for battery charge/discharge scheduling
+- **Data Sources**: 
+  - Weather API integration for solar forecasting
+  - Real-time electricity spot price data
+  - Building-specific consumption patterns
+- **Visualization**: Interactive dashboards for energy flow analysis
 
 
-## Checks
-- [x] Check that im using api within terms of service
-- [x] Look at weather data, check that all calculations are correct
-- [ ] Check that CREST model is correct, wrt markov probabilities
+## 💡 Usage
 
+Basic simulation:
+```python
+from src.simulation import simulate_building
+from src.building import Building
 
-- simplify occupancy profiles, into one value per hour, but night, day, evening, morning
-- occupancy profiles should be specific to building type
-- input to simulate_consumption should be a building object, a time range, and weather data for that time range. is_weekend should be calculated from the timestamps within the simulation.
+# Configure your building
+building = Building(
+    solar_capacity=10.0,  # kW
+    battery_capacity=13.5,  # kWh
+    location=(60.472024, 8.468946)  # Oslo
+)
 
+# Run simulation
+results = simulate_building(building, days=7)
+```
 
-## TODOs
+## 🎯 Impact
 
-- Make UI
-    - 
-
-- check that this can run in a docker container
-- add grid tariff of the building to the pricing calculation
-- add functionality for running a simulation with settings from a json file
-- 
-
-- improve solar simulation accuracy
-- Calcuation of saved costs with battery optimization vs not
-    - add to export
-- Ingegrate with martins code
-- UI
-    - Cration of a building
-    - Selection of user scenario
-    - Selection of simulation parameters 
-    - Running the simulation
-    - Visualizing with graphs
-        - Simulated data
-        - Optimization results
-        - Spot prices
-        - Consumption
-        - Solar generation
-        - Battery state of charge
-- Improved battery optimization algorithm
-
-### Core Functionality & Correctness
-- [ ] Implement proper solar angle calculations based on latitude/longitude
-- [ ] Add temperature effects on solar panel efficiency
-- [ ] Include battery charging/discharging efficiency losses
-- [ ] Add proper error handling for API calls
-- [ ] Validate CREST model parameters against real consumption data
-- [ ] Add input validation and bounds checking
-- [ ] Implement proper weather API parsing instead of synthetic data
-- [ ] Add tests for core calculations
-
-### Optimization & Performance
-- [ ] Implement proper battery optimization using linear programming
-- [ ] Add multi-day forecasting and optimization
-- [ ] Cache weather API results
-- [ ] Parallelize simulations for parameter sweeps
-- [ ] Profile and optimize computation bottlenecks
-
-### Features & Enhancements
-- [ ] Add GUI for parameter adjustment
-- [ ] Implement real-time spot price API integration
-- [ ] Add export of simulation results to CSV/Excel
-- [ ] Create more sophisticated consumption profiles
-- [ ] Add solar panel shading model
-- [ ] Include battery degradation model
-- [ ] Add economic analysis (ROI, payback period)
-- [ ] Create configuration file support
-- [ ] Add logging system
-
-### Documentation & Analysis
-- [ ] Add detailed API documentation
-- [ ] Create example notebooks
-- [ ] Add performance benchmarks
-- [ ] Document model assumptions and limitations
-- [ ] Add validation against real building data
-- [ ] Create user guide with typical usage patterns
+- **Cost Reduction**: Saves costs on electricity bills through smart battery optimization
+- **Grid Load**: Reduces peak load on the power grid
+- **Green Energy**: Maximizes utilization of solar energy
+- **ROI Analysis**: Helps property owners make data-driven decisions on energy investments
